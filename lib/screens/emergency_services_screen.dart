@@ -1,13 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/emergency_history_service.dart';
 import '../services/usage_logger.dart';
 import 'emergency_history_screen.dart';
+import 'safety_hub_screen.dart';
 import 'settings_screen.dart';
 import 'voice_assistant_screen.dart';
 
@@ -18,14 +22,25 @@ const Color _red = Color(0xFFE81218);
 const Color _green = Color(0xFF39D74A);
 const Color _muted = Color(0xFFB7BABF);
 const String _ambulanceNumber = '123';
+const String _policeNumber = '122';
+const String _fireNumber = '180';
 const int _sosHoldSeconds = 3;
 
-enum _SosStage { button, activated, help, details, tracking, resolved }
+enum _SosStage { button, active, resolved }
 
 class EmergencyServicesScreen extends StatefulWidget {
   final void Function(Locale)? onLocaleChanged;
 
-  const EmergencyServicesScreen({super.key, this.onLocaleChanged});
+  /// When true the screen opens directly in the active-SOS state without
+  /// dialing again — used by the Home screen hold-to-call, which has
+  /// already opened the dialer and logged the event.
+  final bool startActive;
+
+  const EmergencyServicesScreen({
+    super.key,
+    this.onLocaleChanged,
+    this.startActive = false,
+  });
 
   @override
   State<EmergencyServicesScreen> createState() =>
@@ -35,26 +50,34 @@ class EmergencyServicesScreen extends StatefulWidget {
 class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
   _SosStage _stage = _SosStage.button;
   Timer? _countdownTimer;
-  Timer? _autoFlowTimer;
+  Timer? _elapsedTimer;
   int _countdown = _sosHoldSeconds;
-  String _locationText = '5th Settlement, New Cairo,\nCairo Governorate, Egypt';
-  bool _shareLocation = true;
   bool _isHoldingSos = false;
-  bool _sosLogged = false;
-  bool _notifiedContacts = false;
-  bool _contactedServices = false;
-  bool _dispatchingAmbulance = false;
+
+  // Real state of the active emergency.
+  DateTime? _sosStartedAt;
+  bool _dialStarted = false;
+  bool _locating = false;
+  Position? _position;
+  String? _address;
+  List<Map<String, dynamic>> _contacts = [];
 
   @override
   void initState() {
     super.initState();
     UsageLogger.logScreenView('EmergencyServicesScreen');
+    if (widget.startActive) {
+      // Home already dialed 123 and logged the SOS; just show live status.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _activateSos(dial: false);
+      });
+    }
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
-    _autoFlowTimer?.cancel();
+    _elapsedTimer?.cancel();
     super.dispose();
   }
 
@@ -62,7 +85,6 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
     if (_stage != _SosStage.button || _isHoldingSos) return;
 
     _countdownTimer?.cancel();
-    _autoFlowTimer?.cancel();
     setState(() {
       _isHoldingSos = true;
       _countdown = _sosHoldSeconds;
@@ -96,89 +118,174 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
     if (!_isHoldingSos) return;
 
     _countdownTimer?.cancel();
+    HapticFeedback.heavyImpact();
     setState(() => _isHoldingSos = false);
     await _activateSos();
   }
 
-  Future<void> _activateSos() async {
-    _countdownTimer?.cancel();
-    setState(() {
-      _stage = _SosStage.activated;
-      _isHoldingSos = false;
-      _notifiedContacts = false;
-      _contactedServices = false;
-      _dispatchingAmbulance = true;
+  /// Starts a real SOS: dials 123 (unless the caller already did), starts
+  /// the elapsed timer, resolves the live location, loads the user's real
+  /// emergency contacts and logs the event to History.
+  Future<void> _activateSos({bool dial = true}) async {
+    _sosStartedAt = DateTime.now();
+    _dialStarted = !dial;
+    setState(() => _stage = _SosStage.active);
+
+    _elapsedTimer?.cancel();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
     });
 
-    await _callEmergencyServices();
-    await _resolveLocation();
+    unawaited(_loadContacts());
+    unawaited(_resolveLocation());
 
-    if (!_sosLogged) {
-      _sosLogged = true;
-      await EmergencyHistoryService.logEvent(
-        type: 'sos',
-        title: 'SOS Activated',
-        description: 'SOS flow activated from app',
-        location: _locationText.replaceAll('\n', ' '),
-        status: 'In Progress',
+    if (dial) {
+      await _dialNumber(_ambulanceNumber);
+      if (mounted) setState(() => _dialStarted = true);
+      unawaited(
+        EmergencyHistoryService.logEvent(
+          type: 'sos',
+          title: 'SOS Ambulance Call Started',
+          description: 'SOS activated from Emergency Services screen',
+          status: 'Started',
+        ).catchError((_) {}),
       );
     }
+  }
 
+  Future<void> _loadContacts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('safety_hub_contacts_json');
+    final contacts = <Map<String, dynamic>>[];
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          contacts.addAll(decoded.whereType<Map<String, dynamic>>());
+        }
+      } catch (_) {}
+    }
     if (!mounted) return;
-
-    setState(() => _notifiedContacts = true);
-    await Future<void>.delayed(const Duration(milliseconds: 650));
-    if (!mounted) return;
-    setState(() => _contactedServices = true);
-    await Future<void>.delayed(const Duration(milliseconds: 650));
-    if (!mounted) return;
-    setState(() => _dispatchingAmbulance = false);
-
-    _scheduleStage(_SosStage.help, const Duration(seconds: 1));
+    setState(() => _contacts = contacts);
   }
 
   Future<void> _resolveLocation() async {
+    setState(() {
+      _locating = true;
+      _position = null;
+      _address = null;
+    });
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
+      if (!serviceEnabled) throw Exception('location off');
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        return;
+        throw Exception('permission denied');
       }
 
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-      _locationText =
-          'Lat ${position.latitude.toStringAsFixed(4)}, '
-          'Lng ${position.longitude.toStringAsFixed(4)}';
+      if (!mounted) return;
+      setState(() => _position = position);
+
+      // Free keyless reverse geocoding (same pattern as the voice
+      // assistant's verified "where am I").
+      try {
+        final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+          'lat': '${position.latitude}',
+          'lon': '${position.longitude}',
+          'format': 'json',
+          'zoom': '17',
+        });
+        final response = await http
+            .get(uri, headers: {'User-Agent': 'amn_app/1.0 (safety app)'})
+            .timeout(const Duration(seconds: 8));
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final name = data['display_name']?.toString();
+        if (name != null && name.isNotEmpty && mounted) {
+          setState(
+            () => _address = name.split(',').take(4).join(',').trim(),
+          );
+        }
+      } catch (_) {}
     } catch (_) {
-      // Keep the mock-friendly fallback location.
+      // _position stays null → the UI shows a truthful "unavailable" state.
+    } finally {
+      if (mounted) setState(() => _locating = false);
     }
   }
 
-  void _scheduleStage(_SosStage nextStage, Duration delay) {
-    _autoFlowTimer?.cancel();
-    _autoFlowTimer = Timer(delay, () {
+  String? get _locationLink {
+    final position = _position;
+    if (position == null) return null;
+    return 'https://www.google.com/maps/search/?api=1&query='
+        '${position.latitude},${position.longitude}';
+  }
+
+  Future<void> _sendLocationSms() async {
+    final link = _locationLink;
+    if (link == null) return;
+    final message = 'EMERGENCY - I need help. My location: $link';
+    unawaited(
+      EmergencyHistoryService.logEvent(
+        type: 'location_share',
+        title: 'Location Shared',
+        description: 'Location link prepared during SOS',
+        location:
+            '${_position!.latitude.toStringAsFixed(6)}, '
+            '${_position!.longitude.toStringAsFixed(6)}',
+        status: 'Completed',
+      ).catchError((_) {}),
+    );
+    var launched = false;
+    try {
+      launched = await launchUrl(
+        Uri.parse('sms:?body=${Uri.encodeComponent(message)}'),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {}
+    if (!launched && mounted) {
+      await Clipboard.setData(ClipboardData(text: message));
       if (!mounted) return;
-      setState(() => _stage = nextStage);
-    });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open messages. Link copied instead.'),
+        ),
+      );
+    }
   }
 
-  void _setStage(_SosStage stage) {
-    _autoFlowTimer?.cancel();
-    setState(() => _stage = stage);
+  Future<void> _copyLocationLink() async {
+    final link = _locationLink;
+    if (link == null) return;
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Location link copied.')),
+    );
   }
 
-  Future<void> _callEmergencyServices() async {
-    final uri = Uri(scheme: 'tel', path: _ambulanceNumber);
+  Future<void> _openNearbyHospitals() async {
+    UsageLogger.logAction('sos_nearby_hospitals');
+    try {
+      await launchUrl(
+        Uri.https('www.google.com', '/maps/search/', {
+          'api': '1',
+          'query': 'hospitals near me',
+        }),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {}
+  }
 
+  Future<void> _dialNumber(String number) async {
+    final uri = Uri(scheme: 'tel', path: number);
     try {
       final launched = await launchUrl(
         uri,
@@ -186,15 +293,54 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
       );
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to start the ambulance call.')),
+          SnackBar(content: Text('Unable to open the dialer with $number.')),
         );
       }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to start the ambulance call.')),
+        SnackBar(content: Text('Unable to open the dialer with $number.')),
       );
     }
+  }
+
+  String get _elapsedText {
+    final startedAt = _sosStartedAt;
+    if (startedAt == null) return '0:00';
+    final elapsed = DateTime.now().difference(startedAt);
+    final hours = elapsed.inHours;
+    final minutes = elapsed.inMinutes % 60;
+    final seconds = elapsed.inSeconds % 60;
+    final mm = minutes.toString().padLeft(hours > 0 ? 2 : 1, '0');
+    final ss = seconds.toString().padLeft(2, '0');
+    return hours > 0 ? '$hours:$mm:$ss' : '$mm:$ss';
+  }
+
+  String get _startedAtText {
+    final startedAt = _sosStartedAt;
+    if (startedAt == null) return '';
+    final hour12 = startedAt.hour % 12 == 0 ? 12 : startedAt.hour % 12;
+    final minute = startedAt.minute.toString().padLeft(2, '0');
+    final period = startedAt.hour >= 12 ? 'PM' : 'AM';
+    return '$hour12:$minute $period';
+  }
+
+  Future<void> _endSos() async {
+    _elapsedTimer?.cancel();
+    unawaited(
+      EmergencyHistoryService.logEvent(
+        type: 'sos',
+        title: 'SOS Ended - Marked Safe',
+        description: 'User marked themselves safe after $_elapsedText',
+        location: _address ??
+            (_position == null
+                ? null
+                : '${_position!.latitude.toStringAsFixed(6)}, '
+                    '${_position!.longitude.toStringAsFixed(6)}'),
+        status: 'Resolved',
+      ).catchError((_) {}),
+    );
+    setState(() => _stage = _SosStage.resolved);
   }
 
   void _openBottomTab(int index) {
@@ -242,11 +388,7 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
             children: [
-              _SosHeader(
-                title: _titleForStage,
-                showCancel: _stage == _SosStage.activated,
-                onCancel: () => _setStage(_SosStage.button),
-              ),
+              _SosHeader(title: _titleForStage),
               const SizedBox(height: 18),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
@@ -262,14 +404,8 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
 
   String get _titleForStage {
     switch (_stage) {
-      case _SosStage.activated:
-        return 'SOS ACTIVATED';
-      case _SosStage.help:
-        return 'HELP IS ON THE WAY!';
-      case _SosStage.details:
-        return 'EMERGENCY DETAILS';
-      case _SosStage.tracking:
-        return 'LIVE TRACKING';
+      case _SosStage.active:
+        return 'SOS ACTIVE';
       case _SosStage.resolved:
         return 'EMERGENCY RESOLVED';
       case _SosStage.button:
@@ -287,36 +423,43 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
           onHoldStart: _startSosHold,
           onHoldCancel: _cancelSosHold,
         );
-      case _SosStage.activated:
-        return _ActivatedStage(
-          key: const ValueKey('activated'),
-          notifiedContacts: _notifiedContacts,
-          contactedServices: _contactedServices,
-          dispatchingAmbulance: _dispatchingAmbulance,
-        );
-      case _SosStage.help:
-        return _HelpStage(
-          key: const ValueKey('help'),
-          location: _locationText,
-          shareLocation: _shareLocation,
-          onShareChanged: (value) => setState(() => _shareLocation = value),
-          onNext: () => _setStage(_SosStage.details),
-        );
-      case _SosStage.details:
-        return _DetailsStage(
-          key: const ValueKey('details'),
-          onCall: _callEmergencyServices,
-          onNext: () => _setStage(_SosStage.tracking),
-        );
-      case _SosStage.tracking:
-        return _TrackingStage(
-          key: const ValueKey('tracking'),
-          onResolved: () => _setStage(_SosStage.resolved),
+      case _SosStage.active:
+        return _ActiveStage(
+          key: const ValueKey('active'),
+          elapsedText: _elapsedText,
+          startedAtText: _startedAtText,
+          dialStarted: _dialStarted,
+          locating: _locating,
+          position: _position,
+          address: _address,
+          contacts: _contacts,
+          onCallAmbulance: () => _dialNumber(_ambulanceNumber),
+          onCallPolice: () => _dialNumber(_policeNumber),
+          onCallFire: () => _dialNumber(_fireNumber),
+          onCallContact: (phone) => _dialNumber(phone),
+          onRetryLocation: _resolveLocation,
+          onSendLocation: _sendLocationSms,
+          onCopyLocation: _copyLocationLink,
+          onNearbyHospitals: _openNearbyHospitals,
+          onOpenSafetyHub: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SafetyHubScreen()),
+            ).then((_) => _loadContacts());
+          },
+          onMarkSafe: _endSos,
         );
       case _SosStage.resolved:
         return _ResolvedStage(
           key: const ValueKey('resolved'),
-          onSummary: () => _setStage(_SosStage.details),
+          onHistory: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const EmergencyHistoryScreen(),
+              ),
+            );
+          },
           onHome: () =>
               Navigator.of(context).popUntil((route) => route.isFirst),
         );
@@ -326,54 +469,23 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
 
 class _SosHeader extends StatelessWidget {
   final String title;
-  final bool showCancel;
-  final VoidCallback onCancel;
 
-  const _SosHeader({
-    required this.title,
-    required this.showCancel,
-    required this.onCancel,
-  });
+  const _SosHeader({required this.title});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 34,
-      child: Stack(
-        children: [
-          Center(
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0,
-              ),
-            ),
+      child: Center(
+        child: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
           ),
-          if (showCancel)
-            Positioned(
-              right: 0,
-              top: 1,
-              child: TextButton.icon(
-                onPressed: onCancel,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 9),
-                  minimumSize: const Size(0, 30),
-                  backgroundColor: Colors.white.withValues(alpha: 0.09),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                icon: const Icon(Icons.close, color: Colors.white, size: 14),
-                label: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Colors.white, fontSize: 12),
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -432,18 +544,22 @@ class _SosButtonStage extends StatelessWidget {
               ),
               SizedBox(height: 16),
               _InfoRow(
+                icon: Icons.call_outlined,
+                text:
+                    'The phone dialer opens with the ambulance number '
+                    '($_ambulanceNumber) — press the green button to call',
+              ),
+              SizedBox(height: 14),
+              _InfoRow(
                 icon: Icons.location_on_outlined,
-                text: 'Your location will be shared',
+                text:
+                    'Your live location is found so you can send it by SMS '
+                    'or call your emergency contacts',
               ),
               SizedBox(height: 14),
               _InfoRow(
-                icon: Icons.groups_outlined,
-                text: 'Emergency contacts will be notified',
-              ),
-              SizedBox(height: 14),
-              _InfoRow(
-                icon: Icons.emergency_share_outlined,
-                text: 'Ambulance will be dispatched',
+                icon: Icons.history,
+                text: 'The SOS is saved to your History with the time',
               ),
             ],
           ),
@@ -453,314 +569,366 @@ class _SosButtonStage extends StatelessWidget {
   }
 }
 
-class _ActivatedStage extends StatelessWidget {
-  final bool notifiedContacts;
-  final bool contactedServices;
-  final bool dispatchingAmbulance;
+class _ActiveStage extends StatelessWidget {
+  final String elapsedText;
+  final String startedAtText;
+  final bool dialStarted;
+  final bool locating;
+  final Position? position;
+  final String? address;
+  final List<Map<String, dynamic>> contacts;
+  final VoidCallback onCallAmbulance;
+  final VoidCallback onCallPolice;
+  final VoidCallback onCallFire;
+  final ValueChanged<String> onCallContact;
+  final VoidCallback onRetryLocation;
+  final VoidCallback onSendLocation;
+  final VoidCallback onCopyLocation;
+  final VoidCallback onNearbyHospitals;
+  final VoidCallback onOpenSafetyHub;
+  final VoidCallback onMarkSafe;
 
-  const _ActivatedStage({
+  const _ActiveStage({
     super.key,
-    required this.notifiedContacts,
-    required this.contactedServices,
-    required this.dispatchingAmbulance,
+    required this.elapsedText,
+    required this.startedAtText,
+    required this.dialStarted,
+    required this.locating,
+    required this.position,
+    required this.address,
+    required this.contacts,
+    required this.onCallAmbulance,
+    required this.onCallPolice,
+    required this.onCallFire,
+    required this.onCallContact,
+    required this.onRetryLocation,
+    required this.onSendLocation,
+    required this.onCopyLocation,
+    required this.onNearbyHospitals,
+    required this.onOpenSafetyHub,
+    required this.onMarkSafe,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasLocation = position != null;
     return Column(
       children: [
-        const SizedBox(height: 14),
-        const _PulseSosButton(size: 166),
-        const SizedBox(height: 14),
-        const Text(
-          'Sending your location...',
-          style: TextStyle(color: Colors.white, fontSize: 14),
-        ),
-        const SizedBox(height: 16),
+        // Live elapsed time — real and ticking.
         _DarkCard(
           child: Column(
             children: [
-              _ProgressRow(
-                text: 'Notifying emergency contacts',
-                done: notifiedContacts,
-              ),
-              const SizedBox(height: 16),
-              _ProgressRow(
-                text: 'Contacting emergency services',
-                done: contactedServices,
-              ),
-              const SizedBox(height: 16),
-              _ProgressRow(
-                text: 'Dispatching ambulance',
-                done: !dispatchingAmbulance,
-                loading: dispatchingAmbulance,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _HelpStage extends StatelessWidget {
-  final String location;
-  final bool shareLocation;
-  final ValueChanged<bool> onShareChanged;
-  final VoidCallback onNext;
-
-  const _HelpStage({
-    super.key,
-    required this.location,
-    required this.shareLocation,
-    required this.onShareChanged,
-    required this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(
-          height: 150,
-          child: Stack(
-            alignment: Alignment.bottomCenter,
-            children: const [
-              Positioned.fill(child: CustomPaint(painter: _CityPainter())),
-              Positioned(bottom: 0, child: _AmbulanceIcon()),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        _DarkCard(
-          child: Column(
-            children: const [
-              Text(
-                'Estimated Time of Arrival',
+              const Text(
+                'SOS active for',
                 style: TextStyle(color: _muted, fontSize: 13),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
-                '6 min',
-                style: TextStyle(
+                elapsedText,
+                style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 34,
+                  fontSize: 40,
                   fontWeight: FontWeight.w700,
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Started at $startedAtText',
+                style: const TextStyle(color: _muted, fontSize: 12),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
+        // What actually happened.
+        _DarkCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _StatusRow(
+                done: dialStarted,
+                doneText: 'Dialer opened with $_ambulanceNumber — press the '
+                    'green button if you have not called yet',
+                pendingText: 'Opening the dialer with $_ambulanceNumber…',
+              ),
+              const SizedBox(height: 14),
+              if (locating)
+                const _StatusRow(
+                  done: false,
+                  loading: true,
+                  doneText: '',
+                  pendingText: 'Finding your location…',
+                )
+              else if (hasLocation)
+                _StatusRow(
+                  done: true,
+                  doneText: address == null
+                      ? 'Location found: '
+                            '${position!.latitude.toStringAsFixed(5)}, '
+                            '${position!.longitude.toStringAsFixed(5)}'
+                      : 'You are near $address',
+                  pendingText: '',
+                )
+              else
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_off_outlined,
+                      color: Colors.orangeAccent,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Location unavailable — check that GPS is on',
+                        style: TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: onRetryLocation,
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Real actions.
+        _PrimaryButton(
+          text: 'Call Ambulance ($_ambulanceNumber) again',
+          onPressed: onCallAmbulance,
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _SecondaryButton(
+                text: 'Police $_policeNumber',
+                icon: Icons.local_police_outlined,
+                onPressed: onCallPolice,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SecondaryButton(
+                text: 'Fire $_fireNumber',
+                icon: Icons.local_fire_department_outlined,
+                onPressed: onCallFire,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _SecondaryButton(
+                text: 'Send location by SMS',
+                icon: Icons.sms_outlined,
+                onPressed: hasLocation ? onSendLocation : null,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SecondaryButton(
+                text: 'Copy location link',
+                icon: Icons.copy,
+                onPressed: hasLocation ? onCopyLocation : null,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _SecondaryButton(
+          text: 'Show nearby hospitals on the map',
+          icon: Icons.local_hospital_outlined,
+          onPressed: onNearbyHospitals,
+        ),
+        const SizedBox(height: 12),
+        // Real emergency contacts from the Safety Hub.
         _DarkCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Location',
+                'Call an emergency contact',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 12),
-              _InfoRow(icon: Icons.location_on_outlined, text: location),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.share_location_outlined,
-                    color: _green,
+              const SizedBox(height: 6),
+              if (contacts.isEmpty) ...[
+                const SizedBox(height: 4),
+                const Text(
+                  'You have no saved emergency contacts yet.',
+                  style: TextStyle(color: _muted, fontSize: 13),
+                ),
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  onPressed: onOpenSafetyHub,
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                  icon: const Icon(
+                    Icons.add_circle_outline,
+                    color: Colors.white,
                     size: 18,
                   ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Share Live Location',
-                      style: TextStyle(color: Colors.white, fontSize: 13),
-                    ),
+                  label: const Text(
+                    'Add contacts in Safety Hub',
+                    style: TextStyle(color: Colors.white, fontSize: 13),
                   ),
-                  Switch(
-                    value: shareLocation,
-                    activeColor: _green,
-                    onChanged: onShareChanged,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        _PrimaryButton(text: 'View Emergency Details', onPressed: onNext),
-      ],
-    );
-  }
-}
-
-class _DetailsStage extends StatelessWidget {
-  final VoidCallback onCall;
-  final VoidCallback onNext;
-
-  const _DetailsStage({super.key, required this.onCall, required this.onNext});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _DarkCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'Who was contacted',
-                style: TextStyle(color: Colors.white, fontSize: 14),
-              ),
-              SizedBox(height: 14),
-              _ContactRow(
-                name: 'Amir (Brother)',
-                phone: '01030802134',
-                status: 'Notified',
-                time: '10:30 AM',
-                icon: Icons.person,
-              ),
-              SizedBox(height: 12),
-              _ContactRow(
-                name: 'Nayera (Mom)',
-                phone: '01012345678',
-                status: 'Notified',
-                time: '10:30 AM',
-                icon: Icons.person,
-              ),
-              SizedBox(height: 12),
-              _ContactRow(
-                name: 'Hospital',
-                phone: 'Dar Al Fouad Hospital',
-                status: 'Contacted',
-                time: '10:31 AM',
-                icon: Icons.local_hospital,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        _DarkCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'Ambulance',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
                 ),
-              ),
-              SizedBox(height: 14),
-              _DetailLine(label: 'Provider', value: 'AMN Emergency'),
-              SizedBox(height: 12),
-              _DetailLine(label: 'Status', value: 'On the way'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        _PrimaryButton(text: 'Call Emergency Services', onPressed: onCall),
-        const SizedBox(height: 12),
-        _SecondaryButton(text: 'Open Live Tracking', onPressed: onNext),
-      ],
-    );
-  }
-}
-
-class _TrackingStage extends StatelessWidget {
-  final VoidCallback onResolved;
-
-  const _TrackingStage({super.key, required this.onResolved});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: const SizedBox(
-            height: 236,
-            width: double.infinity,
-            child: CustomPaint(painter: _TrackingMapPainter()),
-          ),
-        ),
-        const SizedBox(height: 14),
-        _DarkCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'Ambulance is on the way',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 10),
-              Text(
-                '6 min away   •   2.4 km',
-                style: TextStyle(color: _muted, fontSize: 13),
-              ),
-              SizedBox(height: 16),
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Color(0xFF2A3137),
-                    child: Icon(Icons.person, color: Colors.white, size: 22),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              ] else
+                ...contacts.take(4).map(
+                  (contact) => Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Row(
                       children: [
-                        Text(
-                          'Driver',
-                          style: TextStyle(color: _muted, fontSize: 12),
+                        const CircleAvatar(
+                          radius: 17,
+                          backgroundColor: Color(0xFF2A3137),
+                          child: Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 19,
+                          ),
                         ),
-                        SizedBox(height: 3),
-                        Text(
-                          'Ahmed Hassan',
-                          style: TextStyle(color: Colors.white, fontSize: 13),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                [
+                                  (contact['name'] ?? '').toString(),
+                                  if ((contact['relationship'] ?? '')
+                                      .toString()
+                                      .isNotEmpty)
+                                    '(${contact['relationship']})',
+                                ].join(' '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                (contact['phone'] ?? '').toString(),
+                                style: const TextStyle(
+                                  color: _muted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => onCallContact(
+                            (contact['phone'] ?? '').toString(),
+                          ),
+                          icon: const CircleAvatar(
+                            radius: 17,
+                            backgroundColor: _green,
+                            child: Icon(
+                              Icons.call,
+                              color: Colors.white,
+                              size: 17,
+                            ),
+                          ),
+                          tooltip: 'Call',
                         ),
                       ],
                     ),
                   ),
-                  Text(
-                    '4.8 ★',
-                    style: TextStyle(color: Colors.white, fontSize: 13),
-                  ),
-                  SizedBox(width: 12),
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: _red,
-                    child: Icon(Icons.call, color: Colors.white, size: 20),
-                  ),
-                ],
-              ),
+                ),
             ],
           ),
         ),
         const SizedBox(height: 14),
-        _PrimaryButton(text: 'Mark Emergency Resolved', onPressed: onResolved),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton.icon(
+            onPressed: onMarkSafe,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _green,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+            icon: const Icon(Icons.check_circle_outline, size: 20),
+            label: const Text(
+              'I am safe — end SOS',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusRow extends StatelessWidget {
+  final bool done;
+  final bool loading;
+  final String doneText;
+  final String pendingText;
+
+  const _StatusRow({
+    required this.done,
+    required this.doneText,
+    required this.pendingText,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (loading)
+          const SizedBox(
+            width: 17,
+            height: 17,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _muted),
+          )
+        else if (done)
+          const Icon(Icons.check_circle, color: _green, size: 18)
+        else
+          const Icon(Icons.radio_button_checked, color: Colors.white70, size: 17),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            done ? doneText : pendingText,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              height: 1.3,
+            ),
+          ),
+        ),
       ],
     );
   }
 }
 
 class _ResolvedStage extends StatelessWidget {
-  final VoidCallback onSummary;
+  final VoidCallback onHistory;
   final VoidCallback onHome;
 
   const _ResolvedStage({
     super.key,
-    required this.onSummary,
+    required this.onHistory,
     required this.onHome,
   });
 
@@ -807,11 +975,11 @@ class _ResolvedStage extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Thank you for using AMN.',
+          'This SOS was saved to your History.',
           style: TextStyle(color: _muted, fontSize: 13),
         ),
         const SizedBox(height: 34),
-        _SecondaryButton(text: 'View Summary', onPressed: onSummary),
+        _SecondaryButton(text: 'View History', onPressed: onHistory),
         const SizedBox(height: 12),
         _SecondaryButton(text: 'Back to Home', onPressed: onHome),
       ],
@@ -995,154 +1163,6 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _ProgressRow extends StatelessWidget {
-  final String text;
-  final bool done;
-  final bool loading;
-
-  const _ProgressRow({
-    required this.text,
-    required this.done,
-    this.loading = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(Icons.radio_button_checked, color: Colors.white70, size: 17),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(color: Colors.white, fontSize: 13),
-          ),
-        ),
-        if (loading)
-          const SizedBox(
-            width: 17,
-            height: 17,
-            child: CircularProgressIndicator(strokeWidth: 2, color: _muted),
-          )
-        else if (done)
-          const Icon(Icons.check_circle, color: _green, size: 18),
-      ],
-    );
-  }
-}
-
-class _ContactRow extends StatelessWidget {
-  final String name;
-  final String phone;
-  final String status;
-  final String time;
-  final IconData icon;
-
-  const _ContactRow({
-    required this.name,
-    required this.phone,
-    required this.status,
-    required this.time,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: icon == Icons.local_hospital
-              ? Colors.white
-              : const Color(0xFFFFE1D8),
-          child: Icon(
-            icon,
-            color: icon == Icons.local_hospital
-                ? _red
-                : const Color(0xFFD06A50),
-            size: 19,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                phone,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: _muted, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  status,
-                  style: const TextStyle(
-                    color: _green,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.check_circle, color: _green, size: 13),
-              ],
-            ),
-            const SizedBox(height: 3),
-            Text(time, style: const TextStyle(color: _muted, fontSize: 11)),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _DetailLine extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _DetailLine({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 95,
-          child: Text(
-            label,
-            style: const TextStyle(color: _muted, fontSize: 13),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(color: Colors.white, fontSize: 13),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _PrimaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
@@ -1172,12 +1192,30 @@ class _PrimaryButton extends StatelessWidget {
 
 class _SecondaryButton extends StatelessWidget {
   final String text;
-  final VoidCallback onPressed;
+  final IconData? icon;
+  final VoidCallback? onPressed;
 
-  const _SecondaryButton({required this.text, required this.onPressed});
+  const _SecondaryButton({required this.text, required this.onPressed, this.icon});
 
   @override
   Widget build(BuildContext context) {
+    final child = icon == null
+        ? Text(text, style: const TextStyle(fontSize: 14))
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 17),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+            ],
+          );
     return SizedBox(
       width: double.infinity,
       height: 48,
@@ -1186,143 +1224,14 @@ class _SecondaryButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.white,
           backgroundColor: _card,
+          disabledForegroundColor: Colors.white38,
           side: const BorderSide(color: _border),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         ),
-        child: Text(text, style: const TextStyle(fontSize: 14)),
+        child: child,
       ),
     );
   }
-}
-
-class _AmbulanceIcon extends StatelessWidget {
-  const _AmbulanceIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 170,
-      height: 82,
-      child: CustomPaint(painter: _AmbulancePainter()),
-    );
-  }
-}
-
-class _AmbulancePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final body = Paint()..color = Colors.white;
-    final redPaint = Paint()..color = _red;
-    final dark = Paint()..color = const Color(0xFF1B2228);
-    final glass = Paint()..color = const Color(0xFFB9D4E3);
-
-    final bodyRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(18, 25, size.width - 36, 38),
-      const Radius.circular(7),
-    );
-    canvas.drawRRect(bodyRect, body);
-    canvas.drawRect(Rect.fromLTWH(35, 13, 62, 25), body);
-    canvas.drawRect(Rect.fromLTWH(41, 18, 26, 17), glass);
-    canvas.drawRect(Rect.fromLTWH(72, 18, 20, 17), glass);
-    canvas.drawRect(Rect.fromLTWH(102, 38, 26, 7), redPaint);
-    canvas.drawRect(Rect.fromLTWH(113, 28, 6, 26), redPaint);
-    canvas.drawCircle(Offset(48, 65), 11, dark);
-    canvas.drawCircle(Offset(123, 65), 11, dark);
-    canvas.drawCircle(Offset(48, 65), 5, Paint()..color = Colors.white70);
-    canvas.drawCircle(Offset(123, 65), 5, Paint()..color = Colors.white70);
-    canvas.drawRect(Rect.fromLTWH(75, 8, 18, 5), redPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _CityPainter extends CustomPainter {
-  const _CityPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFF151A20);
-    final glow = Paint()
-      ..shader =
-          RadialGradient(
-            colors: [_red.withValues(alpha: 0.38), Colors.transparent],
-          ).createShader(
-            Rect.fromCenter(
-              center: Offset(size.width / 2, size.height * 0.72),
-              width: size.width * 0.9,
-              height: size.height * 0.8,
-            ),
-          );
-
-    canvas.drawRect(Offset.zero & size, glow);
-    final widths = [18.0, 28.0, 20.0, 34.0, 22.0, 26.0, 18.0];
-    var x = size.width * 0.12;
-    for (var i = 0; i < widths.length; i++) {
-      final h = 45 + (i % 3) * 18.0;
-      canvas.drawRect(Rect.fromLTWH(x, size.height - h, widths[i], h), paint);
-      x += widths[i] + 12;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _TrackingMapPainter extends CustomPainter {
-  const _TrackingMapPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = const Color(0xFF11161A),
-    );
-
-    final grid = Paint()
-      ..color = const Color(0xFF2A333A)
-      ..strokeWidth = 1;
-    for (double x = -20; x < size.width; x += 24) {
-      canvas.drawLine(Offset(x, 0), Offset(x + 45, size.height), grid);
-    }
-    for (double y = 0; y < size.height; y += 24) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y + 18), grid);
-    }
-
-    final route = Path()
-      ..moveTo(size.width * 0.18, size.height * 0.72)
-      ..lineTo(size.width * 0.35, size.height * 0.63)
-      ..lineTo(size.width * 0.42, size.height * 0.48)
-      ..lineTo(size.width * 0.58, size.height * 0.43)
-      ..lineTo(size.width * 0.76, size.height * 0.32);
-
-    canvas.drawPath(
-      route,
-      Paint()
-        ..color = _red
-        ..strokeWidth = 3
-        ..style = PaintingStyle.stroke,
-    );
-    canvas.drawPath(
-      route.shift(const Offset(2, -2)),
-      Paint()
-        ..color = Colors.white
-        ..strokeWidth = 3
-        ..style = PaintingStyle.stroke,
-    );
-
-    final pin = Offset(size.width * 0.82, size.height * 0.26);
-    canvas.drawCircle(pin, 14, Paint()..color = _red);
-    canvas.drawCircle(pin, 5, Paint()..color = _bg);
-
-    canvas.save();
-    canvas.translate(size.width * 0.15, size.height * 0.66);
-    _AmbulancePainter().paint(canvas, const Size(76, 40));
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _SosBottomNavigationBar extends StatelessWidget {

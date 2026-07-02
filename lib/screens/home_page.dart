@@ -586,6 +586,15 @@ class _HomePageState extends State<HomePage> {
       ).catchError((_) {}),
     );
     await _callAmbulance();
+    // Land on the live SOS screen so returning from the dialer shows real
+    // status (elapsed time, location, contacts) instead of the plain home.
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const EmergencyServicesScreen(startActive: true),
+      ),
+    );
   }
 
   Future<void> _callAmbulance() async {
