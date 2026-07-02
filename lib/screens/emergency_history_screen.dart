@@ -742,7 +742,7 @@ Color _statusColor(String status) {
       normalized == 'resolved') {
     return _green;
   }
-  if (normalized == 'in progress') return _blue;
+  if (normalized == 'in progress' || normalized == 'started') return _blue;
   return _muted;
 }
 

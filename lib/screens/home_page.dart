@@ -549,6 +549,7 @@ class _HomePageState extends State<HomePage> {
 
     _sosHoldTimer?.cancel();
     _suppressNextSosTap = false;
+    HapticFeedback.lightImpact();
     setState(() => _isHoldingSos = true);
     _sosHoldTimer = Timer(
       const Duration(seconds: _sosHoldSeconds),
@@ -581,7 +582,7 @@ class _HomePageState extends State<HomePage> {
         type: 'sos',
         title: 'SOS Ambulance Call Started',
         description: 'SOS long press from home screen',
-        status: 'In Progress',
+        status: 'Started',
       ).catchError((_) {}),
     );
     await _callAmbulance();
@@ -663,7 +664,15 @@ class _HomePageState extends State<HomePage> {
                 onHoldStart: _startSosHold,
                 onHoldCancel: _cancelSosHold,
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 7),
+              const Center(
+                child: Text(
+                  'Hold $_sosHoldSeconds seconds to call ambulance '
+                  '($_ambulanceNumber) · Tap for options',
+                  style: TextStyle(color: _muted, fontSize: 12, height: 1),
+                ),
+              ),
+              const SizedBox(height: 16),
               const _SectionTitle('Quick Actions'),
               const SizedBox(height: 12),
               Row(
@@ -862,7 +871,7 @@ class _HomeHeader extends StatelessWidget {
   }
 }
 
-class _SosButton extends StatelessWidget {
+class _SosButton extends StatefulWidget {
   final bool isHolding;
   final VoidCallback onTap;
   final VoidCallback onHoldStart;
@@ -874,6 +883,45 @@ class _SosButton extends StatelessWidget {
     required this.onHoldStart,
     required this.onHoldCancel,
   });
+
+  @override
+  State<_SosButton> createState() => _SosButtonState();
+}
+
+class _SosButtonState extends State<_SosButton>
+    with SingleTickerProviderStateMixin {
+  // A finger that drifts further than this is scrolling, not holding —
+  // cancel the hold so a slow scroll over SOS can never dial by accident.
+  static const double _moveSlop = 18;
+
+  late final AnimationController _progress = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: _sosHoldSeconds),
+  );
+  Offset? _downPosition;
+
+  @override
+  void didUpdateWidget(covariant _SosButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isHolding && !oldWidget.isHolding) {
+      _progress.forward(from: 0);
+    } else if (!widget.isHolding && oldWidget.isHolding) {
+      _progress.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    super.dispose();
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    final down = _downPosition;
+    if (down != null && (event.position - down).distance > _moveSlop) {
+      widget.onHoldCancel();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -902,27 +950,59 @@ class _SosButton extends StatelessWidget {
           ),
           child: Listener(
             behavior: HitTestBehavior.opaque,
-            onPointerDown: (_) => onHoldStart(),
-            onPointerUp: (_) => onHoldCancel(),
-            onPointerCancel: (_) => onHoldCancel(),
+            onPointerDown: (event) {
+              _downPosition = event.position;
+              widget.onHoldStart();
+            },
+            onPointerMove: _onPointerMove,
+            onPointerUp: (_) => widget.onHoldCancel(),
+            onPointerCancel: (_) => widget.onHoldCancel(),
             child: InkWell(
-              onTap: onTap,
+              onTap: widget.onTap,
               borderRadius: BorderRadius.circular(9),
-              child: Center(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 120),
-                  child: Text(
-                    isHolding ? 'HOLD' : 'SOS',
-                    key: ValueKey(isHolding),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 31,
-                      fontWeight: FontWeight.w600,
-                      height: 1,
-                      letterSpacing: 0,
+              child: AnimatedBuilder(
+                animation: _progress,
+                builder: (context, _) {
+                  // The label flips to HOLD only after ~150 ms so a quick
+                  // tap doesn't flicker.
+                  final showHold =
+                      widget.isHolding &&
+                      _progress.value > 0.15 / _sosHoldSeconds;
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(9),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: _progress.value,
+                            heightFactor: 1,
+                            child: ColoredBox(
+                              color: Colors.white.withValues(alpha: 0.28),
+                            ),
+                          ),
+                        ),
+                        Center(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 120),
+                            child: Text(
+                              showHold ? 'HOLD' : 'SOS',
+                              key: ValueKey(showHold),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 31,
+                                fontWeight: FontWeight.w600,
+                                height: 1,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ),
