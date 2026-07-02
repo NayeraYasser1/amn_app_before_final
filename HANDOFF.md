@@ -41,7 +41,9 @@ flutter clean; flutter pub get
 flutter build apk --debug --no-version-check          # ~1–2 min after clean
 & $adb install -r "build\app\outputs\flutter-apk\app-debug.apk"
 & $adb shell am force-stop com.example.amn_app        # kill stale process!
-& $adb shell monkey -p com.example.amn_app -c android.intent.category.LAUNCHER 1
+& $adb shell am start -n com.example.amn_app/.MainActivity
+# Do NOT launch with `monkey` — it injects one RANDOM input event, which
+# corrupted on-device test state twice (random taps changed/deleted data).
 ```
 
 If the user says "nothing changed", it is almost always a stale build/process —
