@@ -58,4 +58,19 @@ class MaintenanceRemindersService {
 
   static DateTime dueOf(Map<String, dynamic> item) =>
       DateTime.tryParse((item['due'] ?? '').toString()) ?? DateTime.now();
+
+  /// Whole days from today to the due date (date-only, ignores time of day).
+  static int daysUntil(DateTime due) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return DateTime(due.year, due.month, due.day).difference(today).inDays;
+  }
+
+  static String daysLeftLabel(int days) {
+    if (days < -1) return 'Overdue by ${-days} days';
+    if (days == -1) return 'Overdue since yesterday';
+    if (days == 0) return 'Due today';
+    if (days == 1) return 'Due tomorrow';
+    return 'In $days days';
+  }
 }

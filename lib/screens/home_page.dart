@@ -9,12 +9,13 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/emergency_history_service.dart';
+import '../services/maintenance_reminders_service.dart';
 import '../services/usage_logger.dart';
 import 'settings_screen.dart';
 import 'emergency_services_screen.dart';
 import 'parking_map_screen.dart';
 import 'map_picker_screen.dart';
-import 'engine_status_screen.dart';
+import 'maintenance_reminders_screen.dart';
 import 'voice_assistant_screen.dart';
 import 'pairing_unpaired_screen.dart';
 import 'emergency_history_screen.dart';
@@ -66,13 +67,53 @@ class _HomePageState extends State<HomePage> {
   Color _weatherColor = _yellow;
   List<_HourWeather> _hourly = const [];
 
+  // Maintenance alert card: days left on the Engine check reminder (falls
+  // back to the nearest reminder if none is titled "engine").
+  String _maintAlertTitle = 'Engine check';
+  String _maintAlertSubtitle = 'scheduled !';
+  Color _maintAlertSubtitleColor = Colors.white;
+
   @override
   void initState() {
     super.initState();
     _getUserName();
     _loadDestination();
     _loadWeather();
+    _loadMaintenanceAlert();
     UsageLogger.logScreenView('HomePage');
+  }
+
+  Future<void> _loadMaintenanceAlert() async {
+    final items = await MaintenanceRemindersService.load();
+    if (!mounted) return;
+    if (items.isEmpty) {
+      setState(() {
+        _maintAlertTitle = 'Maintenance';
+        _maintAlertSubtitle = 'No reminders';
+        _maintAlertSubtitleColor = Colors.white;
+      });
+      return;
+    }
+    items.sort(
+      (a, b) => MaintenanceRemindersService.dueOf(
+        a,
+      ).compareTo(MaintenanceRemindersService.dueOf(b)),
+    );
+    final alert = items.firstWhere(
+      (item) =>
+          (item['title'] ?? '').toString().toLowerCase().contains('engine'),
+      orElse: () => items.first,
+    );
+    final days = MaintenanceRemindersService.daysUntil(
+      MaintenanceRemindersService.dueOf(alert),
+    );
+    setState(() {
+      _maintAlertTitle = (alert['title'] ?? 'Maintenance').toString();
+      _maintAlertSubtitle = MaintenanceRemindersService.daysLeftLabel(days);
+      _maintAlertSubtitleColor = days < 0
+          ? _red
+          : (days <= 7 ? _yellow : Colors.white);
+    });
   }
 
   @override
@@ -739,16 +780,19 @@ class _HomePageState extends State<HomePage> {
                   Expanded(
                     child: _AlertCard(
                       icon: Icons.settings_input_component,
-                      title: 'Engine check',
-                      subtitle: 'scheduled !',
-                      onTap: () {
-                        UsageLogger.logAction('engine_alert_tap');
-                        Navigator.push(
+                      title: _maintAlertTitle,
+                      subtitle: _maintAlertSubtitle,
+                      subtitleColor: _maintAlertSubtitleColor,
+                      onTap: () async {
+                        UsageLogger.logAction('maintenance_alert_tap');
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const EngineStatusScreen(),
+                            builder: (context) =>
+                                const MaintenanceRemindersScreen(),
                           ),
                         );
+                        _loadMaintenanceAlert();
                       },
                     ),
                   ),
@@ -1223,6 +1267,7 @@ class _AlertCard extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
   final Color iconColor;
+  final Color subtitleColor;
 
   const _AlertCard({
     required this.icon,
@@ -1230,6 +1275,7 @@ class _AlertCard extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.iconColor = _yellow,
+    this.subtitleColor = Colors.white,
   });
 
   @override
@@ -1274,8 +1320,8 @@ class _AlertCard extends StatelessWidget {
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: subtitleColor,
                           fontSize: 12,
                           height: 1.1,
                           letterSpacing: 0,

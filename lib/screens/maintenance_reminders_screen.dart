@@ -232,21 +232,6 @@ class _MaintenanceRemindersScreenState
   String _formatDate(DateTime date) =>
       '${_months[date.month - 1]} ${date.day}, ${date.year}';
 
-  /// Whole days from today to the due date (date-only, ignores time of day).
-  int _daysUntil(DateTime due) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return DateTime(due.year, due.month, due.day).difference(today).inDays;
-  }
-
-  String _relativeLabel(int days) {
-    if (days < -1) return 'Overdue by ${-days} days';
-    if (days == -1) return 'Overdue since yesterday';
-    if (days == 0) return 'Due today';
-    if (days == 1) return 'Due tomorrow';
-    return 'In $days days';
-  }
-
   Color _relativeColor(int days) {
     if (days < 0) return Colors.redAccent;
     if (days <= 7) return Colors.amber;
@@ -327,7 +312,7 @@ class _MaintenanceRemindersScreenState
                   final item = _items[index];
                   final title = (item['title'] ?? '').toString();
                   final due = MaintenanceRemindersService.dueOf(item);
-                  final days = _daysUntil(due);
+                  final days = MaintenanceRemindersService.daysUntil(due);
                   return Material(
                     color: Colors.grey[900],
                     borderRadius: BorderRadius.circular(16),
@@ -377,7 +362,9 @@ class _MaintenanceRemindersScreenState
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    _relativeLabel(days),
+                                    MaintenanceRemindersService.daysLeftLabel(
+                                      days,
+                                    ),
                                     style: TextStyle(
                                       color: _relativeColor(days),
                                       fontSize: 13,
