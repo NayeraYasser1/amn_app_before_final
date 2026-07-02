@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/emergency_history_service.dart';
+import '../services/sos_alert_service.dart';
 import '../services/usage_logger.dart';
 import 'emergency_history_screen.dart';
 import 'safety_hub_screen.dart';
@@ -27,6 +28,8 @@ const String _fireNumber = '180';
 const int _sosHoldSeconds = 3;
 
 enum _SosStage { button, active, resolved }
+
+enum _AlertState { sending, sent, failed }
 
 class EmergencyServicesScreen extends StatefulWidget {
   final void Function(Locale)? onLocaleChanged;
@@ -62,10 +65,23 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
   String? _address;
   List<Map<String, dynamic>> _contacts = [];
 
+  // Automatic SOS alert SMS to the first contact and first hospital.
+  bool _alertsTriggered = false;
+  String _alertMessage = '';
+  String? _contactAlertLabel;
+  String? _contactAlertPhone;
+  _AlertState? _contactAlertState;
+  String? _hospitalAlertLabel;
+  String? _hospitalAlertPhone;
+  _AlertState? _hospitalAlertState;
+
   @override
   void initState() {
     super.initState();
     UsageLogger.logScreenView('EmergencyServicesScreen');
+    // Ask for the SMS permission up front so the automatic SOS alerts can
+    // go out silently when a real emergency happens.
+    unawaited(SosAlertService.ensureSmsPermission());
     if (widget.startActive) {
       // Home already dialed 123 and logged the SOS; just show live status.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -137,7 +153,13 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
     });
 
     unawaited(_loadContacts());
-    unawaited(_resolveLocation());
+    // Alerts wait for the location attempt so the SMS can carry the live
+    // position; they are sent either way (without the link if GPS fails).
+    unawaited(
+      _resolveLocation().whenComplete(() {
+        if (mounted) unawaited(_sendSosAlerts());
+      }),
+    );
 
     if (dial) {
       await _dialNumber(_ambulanceNumber);
@@ -219,6 +241,92 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
     } finally {
       if (mounted) setState(() => _locating = false);
     }
+  }
+
+  /// Sends the SOS alert SMS to the first emergency contact and the first
+  /// saved hospital — silently, in the background, so the 123 call is not
+  /// interrupted. Runs once per SOS.
+  Future<void> _sendSosAlerts() async {
+    if (_alertsTriggered) return;
+    _alertsTriggered = true;
+
+    final link = _locationLink;
+    _alertMessage = link == null
+        ? 'SOS EMERGENCY from AMN: I need help. '
+              '(My GPS location is unavailable right now.)'
+        : 'SOS EMERGENCY from AMN: I need help. My location: $link';
+
+    final contact = await SosAlertService.firstEmergencyContact();
+    final hospital = await SosAlertService.firstHospital();
+    if (!mounted) return;
+    setState(() {
+      if (contact != null) {
+        final relation = (contact['relationship'] ?? '').trim();
+        _contactAlertLabel = relation.isEmpty
+            ? contact['name']
+            : '${contact['name']} ($relation)';
+        _contactAlertPhone = contact['phone'];
+        _contactAlertState = _AlertState.sending;
+      }
+      if (hospital != null) {
+        _hospitalAlertLabel = hospital['name'];
+        _hospitalAlertPhone = hospital['phone'];
+        _hospitalAlertState = _AlertState.sending;
+      }
+    });
+
+    if (contact != null) {
+      final ok = await SosAlertService.sendSms(
+        phone: contact['phone']!,
+        message: _alertMessage,
+      );
+      if (mounted) {
+        setState(
+          () => _contactAlertState = ok ? _AlertState.sent : _AlertState.failed,
+        );
+      }
+      unawaited(
+        EmergencyHistoryService.logEvent(
+          type: 'sos',
+          title: ok ? 'SOS Alert SMS Sent' : 'SOS Alert SMS Failed',
+          description: 'To $_contactAlertLabel (${contact['phone']})',
+          status: ok ? 'Completed' : 'Failed',
+        ).catchError((_) {}),
+      );
+    }
+
+    if (hospital != null) {
+      final ok = await SosAlertService.sendSms(
+        phone: hospital['phone']!,
+        message: _alertMessage,
+      );
+      if (mounted) {
+        setState(
+          () =>
+              _hospitalAlertState = ok ? _AlertState.sent : _AlertState.failed,
+        );
+      }
+      unawaited(
+        EmergencyHistoryService.logEvent(
+          type: 'sos',
+          title: ok ? 'SOS Alert SMS Sent' : 'SOS Alert SMS Failed',
+          description: 'To $_hospitalAlertLabel (${hospital['phone']})',
+          status: ok ? 'Completed' : 'Failed',
+        ).catchError((_) {}),
+      );
+    }
+  }
+
+  /// Fallback when a silent send fails (e.g. SMS permission denied): open
+  /// the Messages composer prefilled with the same alert.
+  Future<void> _openSmsComposer(String? phone) async {
+    if (phone == null || phone.isEmpty) return;
+    try {
+      await launchUrl(
+        Uri.parse('sms:$phone?body=${Uri.encodeComponent(_alertMessage)}'),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {}
   }
 
   String? get _locationLink {
@@ -433,6 +541,12 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
           position: _position,
           address: _address,
           contacts: _contacts,
+          contactAlertLabel: _contactAlertLabel,
+          contactAlertState: _contactAlertState,
+          hospitalAlertLabel: _hospitalAlertLabel,
+          hospitalAlertState: _hospitalAlertState,
+          onContactAlertRetry: () => _openSmsComposer(_contactAlertPhone),
+          onHospitalAlertRetry: () => _openSmsComposer(_hospitalAlertPhone),
           onCallAmbulance: () => _dialNumber(_ambulanceNumber),
           onCallPolice: () => _dialNumber(_policeNumber),
           onCallFire: () => _dialNumber(_fireNumber),
@@ -544,6 +658,13 @@ class _SosButtonStage extends StatelessWidget {
               ),
               SizedBox(height: 16),
               _InfoRow(
+                icon: Icons.sms_outlined,
+                text:
+                    'An SOS SMS with your live location is sent automatically '
+                    'to your first emergency contact and your first hospital',
+              ),
+              SizedBox(height: 14),
+              _InfoRow(
                 icon: Icons.call_outlined,
                 text:
                     'The phone dialer opens with the ambulance number '
@@ -551,15 +672,8 @@ class _SosButtonStage extends StatelessWidget {
               ),
               SizedBox(height: 14),
               _InfoRow(
-                icon: Icons.location_on_outlined,
-                text:
-                    'Your live location is found so you can send it by SMS '
-                    'or call your emergency contacts',
-              ),
-              SizedBox(height: 14),
-              _InfoRow(
                 icon: Icons.history,
-                text: 'The SOS is saved to your History with the time',
+                text: 'Everything is saved to your History with the time',
               ),
             ],
           ),
@@ -577,6 +691,12 @@ class _ActiveStage extends StatelessWidget {
   final Position? position;
   final String? address;
   final List<Map<String, dynamic>> contacts;
+  final String? contactAlertLabel;
+  final _AlertState? contactAlertState;
+  final String? hospitalAlertLabel;
+  final _AlertState? hospitalAlertState;
+  final VoidCallback onContactAlertRetry;
+  final VoidCallback onHospitalAlertRetry;
   final VoidCallback onCallAmbulance;
   final VoidCallback onCallPolice;
   final VoidCallback onCallFire;
@@ -597,6 +717,12 @@ class _ActiveStage extends StatelessWidget {
     required this.position,
     required this.address,
     required this.contacts,
+    required this.contactAlertLabel,
+    required this.contactAlertState,
+    required this.hospitalAlertLabel,
+    required this.hospitalAlertState,
+    required this.onContactAlertRetry,
+    required this.onHospitalAlertRetry,
     required this.onCallAmbulance,
     required this.onCallPolice,
     required this.onCallFire,
@@ -694,6 +820,22 @@ class _ActiveStage extends StatelessWidget {
                     ),
                   ],
                 ),
+              if (contactAlertState != null) ...[
+                const SizedBox(height: 14),
+                _AlertRow(
+                  label: contactAlertLabel ?? '',
+                  state: contactAlertState!,
+                  onTapWhenFailed: onContactAlertRetry,
+                ),
+              ],
+              if (hospitalAlertState != null) ...[
+                const SizedBox(height: 14),
+                _AlertRow(
+                  label: hospitalAlertLabel ?? '',
+                  state: hospitalAlertState!,
+                  onTapWhenFailed: onHospitalAlertRetry,
+                ),
+              ],
             ],
           ),
         ),
@@ -875,6 +1017,67 @@ class _ActiveStage extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _AlertRow extends StatelessWidget {
+  final String label;
+  final _AlertState state;
+  final VoidCallback onTapWhenFailed;
+
+  const _AlertRow({
+    required this.label,
+    required this.state,
+    required this.onTapWhenFailed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget leading;
+    final String text;
+    switch (state) {
+      case _AlertState.sending:
+        leading = const SizedBox(
+          width: 17,
+          height: 17,
+          child: CircularProgressIndicator(strokeWidth: 2, color: _muted),
+        );
+        text = 'Sending SOS SMS to $label…';
+        break;
+      case _AlertState.sent:
+        leading = const Icon(Icons.check_circle, color: _green, size: 18);
+        text = 'SOS SMS with your location sent to $label';
+        break;
+      case _AlertState.failed:
+        leading = const Icon(
+          Icons.error_outline,
+          color: Colors.orangeAccent,
+          size: 18,
+        );
+        text = 'SMS to $label failed — tap to open Messages';
+        break;
+    }
+
+    final row = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        leading,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (state != _AlertState.failed) return row;
+    return InkWell(onTap: onTapWhenFailed, child: row);
   }
 }
 

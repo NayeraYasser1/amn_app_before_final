@@ -1,12 +1,20 @@
 package com.example.amn_app
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.telephony.SmsManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val channelName = "amn_app/android_calls"
+    private val smsChannelName = "amn_app/sms"
+    private val smsPermissionRequestCode = 7301
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,5 +75,54 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, smsChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "hasSmsPermission" -> result.success(hasSmsPermission())
+                    "requestSmsPermission" -> {
+                        if (!hasSmsPermission()) {
+                            ActivityCompat.requestPermissions(
+                                this,
+                                arrayOf(Manifest.permission.SEND_SMS),
+                                smsPermissionRequestCode,
+                            )
+                        }
+                        result.success(hasSmsPermission())
+                    }
+                    "sendSms" -> {
+                        val phone = call.argument<String>("phone") ?: ""
+                        val message = call.argument<String>("message") ?: ""
+                        when {
+                            phone.isBlank() || message.isBlank() ->
+                                result.success(mapOf("ok" to false, "error" to "bad_args"))
+                            !hasSmsPermission() ->
+                                result.success(mapOf("ok" to false, "error" to "permission"))
+                            else ->
+                                try {
+                                    val smsManager =
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                            getSystemService(SmsManager::class.java)
+                                        } else {
+                                            @Suppress("DEPRECATION")
+                                            SmsManager.getDefault()
+                                        }
+                                    val parts = smsManager.divideMessage(message)
+                                    smsManager.sendMultipartTextMessage(phone, null, parts, null, null)
+                                    result.success(mapOf("ok" to true))
+                                } catch (e: Exception) {
+                                    result.success(
+                                        mapOf("ok" to false, "error" to (e.message ?: "send_failed")),
+                                    )
+                                }
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
+
+    private fun hasSmsPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) ==
+            PackageManager.PERMISSION_GRANTED
 }
