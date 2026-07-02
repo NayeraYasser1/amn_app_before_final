@@ -1,0 +1,137 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../models/emergency_event.dart';
+
+class EmergencyHistoryService {
+  EmergencyHistoryService._();
+
+  static const String _localStorageKey = 'amn_history_events_json';
+  static final StreamController<List<EmergencyEvent>> _controller =
+      StreamController<List<EmergencyEvent>>.broadcast(
+        onListen: () {
+          refresh();
+        },
+      );
+
+  static final CollectionReference<Map<String, dynamic>> _collection =
+      FirebaseFirestore.instance.collection('emergency_events');
+
+  static Future<void> logEvent({
+    required String type,
+    required String title,
+    String? description,
+    String? location,
+    String status = 'Resolved',
+  }) async {
+    final event = EmergencyEvent(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      type: type,
+      title: title,
+      description: description,
+      location: location,
+      status: status,
+      timestamp: DateTime.now(),
+    );
+
+    await _saveLocalEvent(event);
+
+    try {
+      await _collection.add({
+        'type': type,
+        'title': title,
+        'description': description,
+        'location': location,
+        'status': status,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Local history remains available even when Firestore is offline.
+    }
+  }
+
+  static Future<void> refresh() async {
+    _controller.add(await _loadLocalEvents());
+  }
+
+  static Future<void> _saveLocalEvent(EmergencyEvent event) async {
+    final prefs = await SharedPreferences.getInstance();
+    final events = await _loadLocalEvents();
+    final updated = [event, ...events].take(200).toList();
+    // Stored as a single JSON string (setString), not a string list, because
+    // getStringList proved unreliable on this platform's shared_preferences.
+    await prefs.setString(
+      _localStorageKey,
+      jsonEncode(updated.map((item) => item.toMap()).toList()),
+    );
+    _controller.add(updated);
+  }
+
+  static Future<List<EmergencyEvent>> _loadLocalEvents() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    String? raw;
+    try {
+      raw = prefs.getString(_localStorageKey);
+    } catch (_) {
+      // The key may still hold an old string-list value; ignore and reset.
+      raw = null;
+    }
+    if (raw == null || raw.isEmpty) return [];
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      final events = decoded
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (item) =>
+                EmergencyEvent.fromMap((item['id'] ?? '').toString(), item),
+          )
+          .toList();
+      events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      return events;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Stream<List<EmergencyEvent>> localEventsStream() async* {
+    yield await _loadLocalEvents();
+    yield* _controller.stream;
+  }
+
+  static Stream<List<EmergencyEvent>> eventsStream() {
+    return localEventsStream();
+  }
+
+  static Stream<List<EmergencyEvent>> firestoreEventsStream() {
+    return _collection.orderBy('timestamp', descending: true).snapshots().map((
+      snapshot,
+    ) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        final timestamp = data['timestamp'];
+        DateTime ts;
+        if (timestamp is Timestamp) {
+          ts = timestamp.toDate();
+        } else {
+          ts = DateTime.tryParse(timestamp?.toString() ?? '') ?? DateTime.now();
+        }
+
+        return EmergencyEvent(
+          id: doc.id,
+          type: data['type'] as String? ?? 'unknown',
+          title: data['title'] as String? ?? 'Emergency',
+          description: data['description'] as String?,
+          location: data['location'] as String?,
+          status: data['status'] as String? ?? 'Resolved',
+          timestamp: ts,
+        );
+      }).toList();
+    });
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1080653613816",
+    "project_id": "amngradapp",
+    "storage_bucket": "amngradapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1080653613816:android:d79868b358cbad8f3cc90d",
+        "android_client_info": {
+          "package_name": "com.example.amn_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOta4rIvNoLFdtaFdzKcFHSnZh_bouSw8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

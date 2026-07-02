@@ -1,0 +1,501 @@
+{
+  "version": "1.3",
+  "notes": "Active English-only voice catalog for AMN. It includes only commands that are wired to real app screens, Pi pages, Android call actions, or ESP32 hardware actions. Order matters: specific phrases must appear before generic slot phrases.",
+  "commands": [
+    {
+      "category": "app_emergency",
+      "intent": "dial_police",
+      "targets": ["app"],
+      "phrases": ["call police", "call the police"],
+      "app_action": "dial_police",
+      "confirmation": "Calling the police on 122."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "dial_ambulance",
+      "targets": ["app"],
+      "phrases": ["call ambulance", "call an ambulance", "i need an ambulance"],
+      "app_action": "dial_ambulance",
+      "confirmation": "Calling an ambulance on 123."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "dial_fire",
+      "targets": ["app"],
+      "phrases": ["call fire", "call the fire department", "call fire department"],
+      "app_action": "dial_fire",
+      "confirmation": "Calling the fire department on 180."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "dial_traffic",
+      "targets": ["app"],
+      "phrases": ["call traffic police", "call the traffic police"],
+      "app_action": "dial_traffic",
+      "confirmation": "Calling the traffic police on 128."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "open_safety_hub",
+      "targets": ["app"],
+      "phrases": ["open safety hub", "show safety hub", "safety hub"],
+      "app_action": "open_safety_hub",
+      "confirmation": "Opening the safety hub."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "open_emergency_numbers",
+      "targets": ["app"],
+      "phrases": ["show emergency numbers", "open emergency numbers", "emergency numbers"],
+      "app_action": "open_emergency_numbers",
+      "confirmation": "Opening emergency numbers."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "first_aid_topic",
+      "targets": ["app"],
+      "phrases": ["first aid for [topic]", "what to do for [topic]", "how to treat [topic]"],
+      "app_action": "first_aid_topic",
+      "confirmation": "Opening first aid."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "open_first_aid",
+      "targets": ["app"],
+      "phrases": ["open first aid", "show first aid tips", "show first aid", "first aid tips"],
+      "app_action": "open_first_aid",
+      "confirmation": "Opening first aid tips."
+    },
+    {
+      "category": "app_parking",
+      "intent": "find_my_car",
+      "targets": ["app"],
+      "phrases": ["find my car", "where is my car", "wheres my car", "where did i park", "navigate to my car", "take me to my car"],
+      "app_action": "find_my_car",
+      "confirmation": "Finding your car."
+    },
+    {
+      "category": "app_parking",
+      "intent": "save_parking",
+      "targets": ["app"],
+      "phrases": ["save my parking", "save parking location", "save parking", "remember where i parked"],
+      "app_action": "save_parking",
+      "confirmation": "Opening parking so you can save your spot."
+    },
+    {
+      "category": "app_navigation",
+      "intent": "set_destination",
+      "targets": ["app"],
+      "phrases": ["set a destination", "set destination", "pick a destination", "choose a destination"],
+      "app_action": "set_destination",
+      "confirmation": "Opening the destination picker."
+    },
+    {
+      "category": "app_navigation",
+      "intent": "cancel_trip",
+      "targets": ["app"],
+      "phrases": ["cancel my trip", "cancel the trip", "cancel destination", "clear my destination"],
+      "app_action": "cancel_trip",
+      "confirmation": "Trip canceled."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "send_sos",
+      "targets": ["app"],
+      "phrases": ["send sos", "send an sos", "send emergency alert", "send the sos"],
+      "app_action": "send_sos",
+      "confirmation": "Sending SOS."
+    },
+    {
+      "category": "app_location",
+      "intent": "where_am_i",
+      "targets": ["app"],
+      "phrases": ["where am i", "what is my location", "whats my location", "my current location", "what is my current location"],
+      "app_action": "where_am_i",
+      "confirmation": "Checking your location."
+    },
+    {
+      "category": "app_location",
+      "intent": "send_my_location",
+      "targets": ["app"],
+      "phrases": ["send my location", "share my location", "send location", "share location"],
+      "app_action": "send_my_location",
+      "confirmation": "Preparing your location to share."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "nearby_hospitals_app",
+      "targets": ["app"],
+      "phrases": ["show nearby hospitals", "find nearest hospital", "hospitals near me", "find a hospital", "nearest hospital"],
+      "app_action": "nearby_hospitals",
+      "confirmation": "Searching for hospitals near you."
+    },
+    {
+      "category": "app_service",
+      "intent": "find_gas_station",
+      "targets": ["app"],
+      "phrases": ["find nearest gas station", "find a gas station", "gas station near me", "find nearest petrol station", "petrol station near me", "find gas station"],
+      "app_action": "find_gas_station",
+      "confirmation": "Searching for gas stations near you."
+    },
+    {
+      "category": "app_maintenance",
+      "intent": "maintenance_reminders",
+      "targets": ["app"],
+      "phrases": ["show maintenance reminders", "maintenance reminders", "show my maintenance", "open maintenance"],
+      "app_action": "show_maintenance",
+      "confirmation": "Opening maintenance reminders."
+    },
+    {
+      "category": "app_maintenance",
+      "intent": "next_maintenance",
+      "targets": ["app"],
+      "phrases": ["when is my next maintenance", "next maintenance", "when is my maintenance due", "when is the next maintenance"],
+      "app_action": "next_maintenance",
+      "confirmation": "Checking your next maintenance."
+    },
+    {
+      "category": "app_service",
+      "intent": "find_car_repair",
+      "targets": ["app"],
+      "phrases": ["find a mechanic", "find car repair", "car repair near me", "my car broke down", "roadside assistance", "find a workshop"],
+      "app_action": "find_car_repair",
+      "confirmation": "Opening car service."
+    },
+    {
+      "category": "app_weather",
+      "intent": "weather_report",
+      "targets": ["app"],
+      "phrases": ["what is the weather", "whats the weather", "how is the weather", "hows the weather", "weather report", "temperature outside", "what is the temperature outside", "whats the temperature outside"],
+      "app_action": "weather_report",
+      "confirmation": "Checking the weather."
+    },
+    {
+      "category": "app_navigation",
+      "intent": "open_history",
+      "targets": ["app"],
+      "phrases": ["show history", "open history", "show my history", "open emergency history"],
+      "app_action": "open_history",
+      "confirmation": "Opening your history."
+    },
+    {
+      "category": "app_navigation",
+      "intent": "open_settings",
+      "targets": ["app"],
+      "phrases": ["open settings", "show settings", "open app settings"],
+      "app_action": "open_settings",
+      "confirmation": "Opening settings."
+    },
+    {
+      "category": "app_profile",
+      "intent": "open_profile",
+      "targets": ["app"],
+      "phrases": ["show my profile", "open my account", "edit my profile", "show my driver settings"],
+      "app_action": "open_profile",
+      "confirmation": "Opening your profile."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "open_emergency_contacts",
+      "targets": ["app"],
+      "phrases": ["show emergency contacts", "add emergency contact", "remove emergency contact", "change my emergency contacts"],
+      "app_action": "open_emergency_contacts",
+      "confirmation": "Opening your emergency contacts."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "open_hospital_insurance",
+      "targets": ["app"],
+      "phrases": ["show insurance info", "update insurance info"],
+      "app_action": "open_hospital_insurance",
+      "confirmation": "Opening hospitals and insurance."
+    },
+    {
+      "category": "app_connection",
+      "intent": "open_pairing",
+      "targets": ["app"],
+      "phrases": ["connect to my car", "reconnect to car"],
+      "app_action": "open_pairing",
+      "confirmation": "Opening car pairing."
+    },
+    {
+      "category": "app_status",
+      "intent": "open_car_status",
+      "targets": ["app"],
+      "phrases": ["show car connection status", "show car readiness", "is my car connected", "is the driver verified", "show current driver", "show active route", "show current music"],
+      "app_action": "open_car_status",
+      "confirmation": "Opening car status."
+    },
+    {
+      "category": "app_location",
+      "intent": "open_parking_map",
+      "targets": ["app"],
+      "phrases": ["show my car location", "show live location", "share car location", "open car route"],
+      "app_action": "open_parking_map",
+      "confirmation": "Opening live car location."
+    },
+    {
+      "category": "software_navigation",
+      "intent": "open_dashboard",
+      "targets": ["software", "app"],
+      "phrases": ["open dashboard", "go home", "go to dashboard", "open home", "show dashboard"],
+      "software_action": "show_home",
+      "app_action": "go_home",
+      "confirmation": "Opening dashboard."
+    },
+    {
+      "category": "software_navigation",
+      "intent": "open_camera",
+      "targets": ["software", "app"],
+      "phrases": ["open camera", "show camera", "turn on camera"],
+      "software_action": "show_camera",
+      "confirmation": "Opening camera."
+    },
+    {
+      "category": "software_navigation",
+      "intent": "open_music",
+      "targets": ["software", "app"],
+      "phrases": ["open music", "show music", "open player"],
+      "software_action": "show_music",
+      "confirmation": "Opening music."
+    },
+    {
+      "category": "software_navigation",
+      "intent": "open_maps",
+      "targets": ["software", "app"],
+      "phrases": ["open maps", "show maps", "open navigation", "show navigation"],
+      "software_action": "show_maps",
+      "app_action": "open_maps_app",
+      "confirmation": "Opening maps."
+    },
+    {
+      "category": "software_navigation",
+      "intent": "open_phone",
+      "targets": ["software", "app"],
+      "phrases": ["open phone", "open bluetooth", "show bluetooth page", "phone integration"],
+      "software_action": "show_phone",
+      "confirmation": "Opening phone integration."
+    },
+    {
+      "category": "software_navigation",
+      "intent": "open_calls",
+      "targets": ["software", "app"],
+      "phrases": ["open calls", "show calls", "open call screen", "open dialer"],
+      "software_action": "show_calls",
+      "confirmation": "Opening calls."
+    },
+    {
+      "category": "software_navigation",
+      "intent": "open_emergency",
+      "targets": ["software", "app"],
+      "phrases": ["open emergency", "open sos", "show sos", "emergency screen"],
+      "software_action": "show_emergency",
+      "app_action": "open_emergency_services",
+      "confirmation": "Opening emergency."
+    },
+    {
+      "category": "software_navigation",
+      "intent": "open_voice",
+      "targets": ["software", "app"],
+      "phrases": ["open voice", "open voice assistant", "show voice assistant"],
+      "software_action": "show_voice",
+      "confirmation": "Opening voice assistant."
+    },
+    {
+      "category": "system",
+      "intent": "go_back",
+      "targets": ["software"],
+      "phrases": ["go back", "close this page"],
+      "software_action": "go_back",
+      "confirmation": "Going back."
+    },
+    {
+      "category": "system",
+      "intent": "lock_system",
+      "targets": ["software"],
+      "phrases": ["lock system", "log out", "switch user"],
+      "software_action": "lock_system",
+      "confirmation": "Locking the system."
+    },
+    {
+      "category": "engine",
+      "intent": "start_engine",
+      "targets": ["software"],
+      "phrases": ["start engine", "turn engine on"],
+      "software_action": "start_engine",
+      "confirmation": "Starting engine."
+    },
+    {
+      "category": "engine",
+      "intent": "stop_engine",
+      "targets": ["software"],
+      "phrases": ["stop engine", "turn engine off"],
+      "software_action": "stop_engine",
+      "confirmation": "Stopping engine."
+    },
+    {
+      "category": "hardware",
+      "intent": "read_temperature",
+      "targets": ["software"],
+      "phrases": ["temp", "temperature", "read temperature", "what is the temperature"],
+      "software_action": "read_temperature",
+      "confirmation": "Reading temperature."
+    },
+    {
+      "category": "hardware",
+      "intent": "move_right_mirror",
+      "targets": ["software"],
+      "phrases": ["move right mirror to [angle]", "move the right mirror to [angle]", "set right mirror to [angle]", "set the right mirror to [angle]", "right mirror [angle]", "right mirror to [angle]"],
+      "software_action": "move_right_mirror",
+      "confirmation": "Moving the right mirror."
+    },
+    {
+      "category": "hardware",
+      "intent": "move_left_mirror",
+      "targets": ["software"],
+      "phrases": ["move left mirror to [angle]", "move the left mirror to [angle]", "set left mirror to [angle]", "set the left mirror to [angle]", "left mirror [angle]", "left mirror to [angle]"],
+      "software_action": "move_left_mirror",
+      "confirmation": "Moving the left mirror."
+    },
+    {
+      "category": "hardware",
+      "intent": "move_both_mirrors",
+      "targets": ["software"],
+      "phrases": ["move both mirrors to [angle]", "move the mirrors to [angle]", "set both mirrors to [angle]", "set the mirrors to [angle]", "mirrors [angle]", "mirrors to [angle]", "set mirrors to [angle]"],
+      "software_action": "move_both_mirrors",
+      "confirmation": "Moving both mirrors."
+    },
+    {
+      "category": "face_id",
+      "intent": "who_am_i",
+      "targets": ["software"],
+      "phrases": ["who am i", "show driver profile"],
+      "software_action": "who_am_i",
+      "confirmation": "Showing driver profile."
+    },
+    {
+      "category": "camera",
+      "intent": "camera_capture",
+      "targets": ["software"],
+      "phrases": ["take a photo", "capture image", "show last photo", "delete last photo"],
+      "software_action": "camera_capture",
+      "confirmation": "Handling camera command."
+    },
+    {
+      "category": "camera",
+      "intent": "camera_recording",
+      "targets": ["software"],
+      "phrases": ["start recording", "stop recording", "show last video", "open gallery"],
+      "software_action": "camera_recording",
+      "confirmation": "Handling recording command."
+    },
+    {
+      "category": "bluetooth",
+      "intent": "bluetooth_management",
+      "targets": ["software"],
+      "phrases": ["scan for phones", "pair this phone", "connect my phone", "reconnect my phone", "disconnect phone", "forget this phone", "trust this phone", "show connected phone", "show bluetooth status"],
+      "software_action": "bluetooth_management",
+      "confirmation": "Opening Bluetooth controls."
+    },
+    {
+      "category": "bluetooth",
+      "intent": "audio_route_management",
+      "targets": ["software"],
+      "phrases": ["set speaker output", "set microphone input", "prepare music route", "prepare hands free"],
+      "software_action": "audio_route_management",
+      "confirmation": "Preparing audio routing."
+    },
+    {
+      "category": "calls",
+      "intent": "call_control",
+      "targets": ["software"],
+      "phrases": ["answer call", "reject call", "end call", "show call status"],
+      "software_action": "call_control",
+      "confirmation": "Handling call control."
+    },
+    {
+      "category": "calls",
+      "intent": "call_audio_control",
+      "targets": ["software"],
+      "phrases": ["mute microphone", "unmute microphone"],
+      "software_action": "call_audio_control",
+      "confirmation": "Updating call audio."
+    },
+    {
+      "category": "maps",
+      "intent": "search_place",
+      "targets": ["software", "app"],
+      "phrases": ["search for [place]", "find nearest restaurant"],
+      "software_action": "search_place",
+      "app_action": "search_place_app",
+      "confirmation": "Searching the map."
+    },
+    {
+      "category": "maps",
+      "intent": "navigate_place",
+      "targets": ["software", "app"],
+      "phrases": ["navigate to [place]", "take me to [place]", "set destination to [place]"],
+      "software_action": "navigate_place",
+      "app_action": "navigate_place_app",
+      "confirmation": "Preparing navigation."
+    },
+    {
+      "category": "maps",
+      "intent": "route_control",
+      "targets": ["software"],
+      "phrases": ["start route", "start navigation", "stop navigation", "cancel route", "use current location", "refresh map"],
+      "software_action": "route_control",
+      "confirmation": "Updating navigation."
+    },
+    {
+      "category": "emergency",
+      "intent": "activate_sos",
+      "targets": ["software", "app"],
+      "phrases": ["activate sos", "help me now"],
+      "software_action": "activate_sos",
+      "app_action": "open_emergency_services",
+      "confirmation": "Activating SOS."
+    },
+    {
+      "category": "emergency",
+      "intent": "emergency_calls",
+      "targets": ["software"],
+      "phrases": ["call emergency contact"],
+      "software_action": "emergency_calls",
+      "confirmation": "Preparing emergency call."
+    },
+    {
+      "category": "emergency",
+      "intent": "emergency_sharing",
+      "targets": ["software"],
+      "phrases": ["show nearby hospitals", "open emergency profile", "update emergency profile"],
+      "software_action": "emergency_sharing",
+      "confirmation": "Handling emergency command."
+    },
+    {
+      "category": "system",
+      "intent": "voice_status",
+      "targets": ["software", "app"],
+      "phrases": ["voice status", "assistant status", "are you ready"],
+      "software_action": "voice_status",
+      "confirmation": "Voice command system is ready."
+    },
+    {
+      "category": "system",
+      "intent": "help",
+      "targets": ["software", "app"],
+      "phrases": ["help", "what can you do", "voice help", "show commands"],
+      "software_action": "voice_help",
+      "app_action": "voice_help",
+      "confirmation": "I can call emergency services or your contacts, find your car, set destinations, open first aid, report the weather, and control car pages, camera, maps, Bluetooth, and hardware."
+    },
+    {
+      "category": "app_emergency",
+      "intent": "call_contact",
+      "targets": ["app"],
+      "phrases": ["call [name]", "phone [name]", "dial [name]"],
+      "app_action": "call_contact",
+      "confirmation": "Calling your contact."
+    }
+  ]
+}
