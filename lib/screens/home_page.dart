@@ -67,11 +67,12 @@ class _HomePageState extends State<HomePage> {
   Color _weatherColor = _yellow;
   List<_HourWeather> _hourly = const [];
 
-  // Maintenance alert card: days left on the Engine check reminder (falls
-  // back to the nearest reminder if none is titled "engine").
+  // Maintenance alert card: the reminder pinned on the Maintenance
+  // Reminders screen (falls back to engine / nearest), with its own icon.
   String _maintAlertTitle = 'Engine check';
   String _maintAlertSubtitle = 'scheduled !';
   Color _maintAlertSubtitleColor = Colors.white;
+  IconData _maintAlertIcon = Icons.settings_input_component;
 
   @override
   void initState() {
@@ -86,33 +87,27 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadMaintenanceAlert() async {
     final items = await MaintenanceRemindersService.load();
     if (!mounted) return;
-    if (items.isEmpty) {
+    final alert = MaintenanceRemindersService.homeAlertItem(items);
+    if (alert == null) {
       setState(() {
         _maintAlertTitle = 'Maintenance';
         _maintAlertSubtitle = 'No reminders';
         _maintAlertSubtitleColor = Colors.white;
+        _maintAlertIcon = Icons.build;
       });
       return;
     }
-    items.sort(
-      (a, b) => MaintenanceRemindersService.dueOf(
-        a,
-      ).compareTo(MaintenanceRemindersService.dueOf(b)),
-    );
-    final alert = items.firstWhere(
-      (item) =>
-          (item['title'] ?? '').toString().toLowerCase().contains('engine'),
-      orElse: () => items.first,
-    );
+    final title = (alert['title'] ?? 'Maintenance').toString();
     final days = MaintenanceRemindersService.daysUntil(
       MaintenanceRemindersService.dueOf(alert),
     );
     setState(() {
-      _maintAlertTitle = (alert['title'] ?? 'Maintenance').toString();
+      _maintAlertTitle = title;
       _maintAlertSubtitle = MaintenanceRemindersService.daysLeftLabel(days);
       _maintAlertSubtitleColor = days < 0
           ? _red
           : (days <= 7 ? _yellow : Colors.white);
+      _maintAlertIcon = MaintenanceRemindersService.iconFor(title);
     });
   }
 
@@ -779,7 +774,7 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Expanded(
                     child: _AlertCard(
-                      icon: Icons.settings_input_component,
+                      icon: _maintAlertIcon,
                       title: _maintAlertTitle,
                       subtitle: _maintAlertSubtitle,
                       subtitleColor: _maintAlertSubtitleColor,
