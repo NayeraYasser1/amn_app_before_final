@@ -11,6 +11,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/emergency_history_service.dart';
+import '../services/maintenance_reminders_service.dart';
 import '../services/usage_logger.dart';
 import '../services/voice_command_sync_service.dart';
 import 'engine_status_screen.dart';
@@ -20,6 +21,7 @@ import 'emergency_history_screen.dart';
 import 'emergency_services_screen.dart';
 import 'hospital_insurance_screen.dart';
 import 'home_page.dart';
+import 'maintenance_reminders_screen.dart';
 import 'map_picker_screen.dart';
 import 'pairing_unpaired_screen.dart';
 import 'parking_map_screen.dart';
@@ -763,43 +765,6 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
     return true;
   }
 
-  // Maintenance reminders, stored locally and seeded on first use.
-  Future<List<Map<String, dynamic>>> _loadMaintenance() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('maintenance_reminders_json');
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is List) {
-          final items = decoded.whereType<Map<String, dynamic>>().toList();
-          if (items.isNotEmpty) return items;
-        }
-      } catch (_) {}
-    }
-
-    final now = DateTime.now();
-    final seeded = [
-      {
-        'title': 'Engine check',
-        'due': now.add(const Duration(days: 14)).toIso8601String(),
-      },
-      {
-        'title': 'Oil change',
-        'due': now.add(const Duration(days: 90)).toIso8601String(),
-      },
-      {
-        'title': 'Tire rotation',
-        'due': now.add(const Duration(days: 180)).toIso8601String(),
-      },
-      {
-        'title': 'License renewal',
-        'due': now.add(const Duration(days: 365)).toIso8601String(),
-      },
-    ];
-    await prefs.setString('maintenance_reminders_json', jsonEncode(seeded));
-    return seeded;
-  }
-
   String _formatDate(DateTime date) {
     const months = [
       'January',
@@ -819,33 +784,40 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   }
 
   Future<bool> _speakMaintenance({required bool openScreen}) async {
-    final items = await _loadMaintenance();
-    items.sort((a, b) {
-      final dueA =
-          DateTime.tryParse((a['due'] ?? '').toString()) ?? DateTime.now();
-      final dueB =
-          DateTime.tryParse((b['due'] ?? '').toString()) ?? DateTime.now();
-      return dueA.compareTo(dueB);
-    });
+    final items = await MaintenanceRemindersService.load();
+
+    if (openScreen && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const MaintenanceRemindersScreen()),
+      );
+    }
+
+    if (items.isEmpty) {
+      await _setAssistantReply(
+        openScreen
+            ? 'You have no maintenance reminders. Opening maintenance '
+                  'reminders so you can add one.'
+            : 'You have no maintenance reminders.',
+        speak: true,
+      );
+      return true;
+    }
+
+    items.sort(
+      (a, b) => MaintenanceRemindersService.dueOf(
+        a,
+      ).compareTo(MaintenanceRemindersService.dueOf(b)),
+    );
 
     final next = items.first;
-    final nextDue =
-        DateTime.tryParse((next['due'] ?? '').toString()) ?? DateTime.now();
     final nextLine =
-        '${next['title']} on ${_formatDate(nextDue)}';
+        '${next['title']} on ${_formatDate(MaintenanceRemindersService.dueOf(next))}';
 
     if (openScreen) {
-      final listing = items
-          .map((item) {
-            final due =
-                DateTime.tryParse((item['due'] ?? '').toString()) ??
-                DateTime.now();
-            return '${item['title']} on ${_formatDate(due)}';
-          })
-          .join(', ');
       await _setAssistantReply(
-        'You have ${items.length} maintenance reminders: $listing. '
-        'The nearest one is $nextLine.',
+        'Opening maintenance reminders. You have ${items.length}; '
+        'the nearest one is $nextLine.',
         speak: true,
       );
     } else {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'language_country_screen.dart';
 import 'edit_profile_screen.dart';
 import 'car_information_screen.dart';
+import 'maintenance_reminders_screen.dart';
 import 'driver_license_screen.dart';
 import 'android_call_bridge_status_screen.dart';
 import 'emergency_history_screen.dart';
@@ -172,6 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 8),
               _buildSettingsContainer([
                 'Vehicle Model & Info',
+                'Maintenance Reminders',
                 'Link/Unlink Vehicle',
                 'Security Options',
               ]),
@@ -384,6 +386,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const CarInformationScreen()),
+      );
+    } else if (label == 'Maintenance Reminders') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const MaintenanceRemindersScreen()),
       );
     } else if (label == 'Android Call Bridge') {
       Navigator.push(
