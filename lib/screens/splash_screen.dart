@@ -32,7 +32,7 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.forward();
 
     // الانتقال التلقائي بعد 3 ثواني للصفحة الرئيسية
-    Timer(const Duration(seconds: 5), () {
+    Timer(const Duration(seconds: 3), () {
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, 'home');
     });

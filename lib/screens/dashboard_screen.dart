@@ -45,7 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             SizedBox(height: 2),
             Text(
-              'Last checked: 2 mins ago',
+              'Sample data · demo',
               style: TextStyle(color: Colors.white70, fontSize: 11),
             ),
           ],

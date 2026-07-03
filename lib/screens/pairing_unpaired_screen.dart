@@ -308,7 +308,7 @@ class _SelectCarStage extends StatelessWidget {
           SizedBox(height: 8),
           Center(
             child: Text(
-              '1 car found',
+              '1 car found (demo)',
               style: TextStyle(color: _muted, fontSize: 15),
             ),
           ),

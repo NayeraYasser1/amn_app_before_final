@@ -19,7 +19,7 @@ class CarControlScreen extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: const Text(
-            'Car Controls',
+            'Car Controls (Demo)',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           centerTitle: false,
