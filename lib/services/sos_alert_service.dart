@@ -58,13 +58,13 @@ class SosAlertService {
   }
 
   /// The Safety Hub contact marked as the SOS default (falling back to the
-  /// first contact, then to the seed used before the user saves their own).
+  /// first saved contact). Returns null when the user has saved no contacts —
+  /// SOS must never text a placeholder/seed number that could belong to a real
+  /// stranger, so callers treat null as "no contact configured".
   static Future<Map<String, String>?> firstEmergencyContact() async {
     final prefs = await SharedPreferences.getInstance();
     final contacts = _decodeList(prefs.getString('safety_hub_contacts_json'));
-    if (contacts.isEmpty) {
-      return {'name': 'Nayera', 'phone': '01012345678', 'relationship': 'Mom'};
-    }
+    if (contacts.isEmpty) return null;
     final chosen = contacts.firstWhere(
       (c) => c['default'] == true,
       orElse: () => contacts.first,
@@ -79,19 +79,22 @@ class SosAlertService {
   }
 
   /// The Safety Hub hospital marked as the SOS default (falling back to the
-  /// first hospital, then to the El Salam seed).
+  /// first saved hospital). Returns null when none are saved, or when the saved
+  /// number is a short code (<= 6 digits) — Egyptian hospital hotlines like
+  /// 19885 are voice-only and cannot receive an SMS, so we never pretend to
+  /// text one.
   static Future<Map<String, String>?> firstHospital() async {
     final prefs = await SharedPreferences.getInstance();
     final hospitals = _decodeList(prefs.getString('safety_hub_hospitals_json'));
-    if (hospitals.isEmpty) {
-      return {'name': 'El Salam Hospital', 'phone': '19885'};
-    }
+    if (hospitals.isEmpty) return null;
     final chosen = hospitals.firstWhere(
       (h) => h['default'] == true,
       orElse: () => hospitals.first,
     );
     final phone = (chosen['phone'] ?? '').toString().trim();
     if (phone.isEmpty) return null;
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length <= 6) return null;
     return {'name': (chosen['name'] ?? '').toString(), 'phone': phone};
   }
 }

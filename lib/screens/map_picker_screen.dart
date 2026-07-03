@@ -77,6 +77,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 

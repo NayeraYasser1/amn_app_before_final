@@ -191,18 +191,18 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
           }
         },
         codeSent: (verificationId, forceResendingToken) {
+          // Arrives asynchronously; bail if the user already left the screen.
+          if (!mounted) return;
           setState(() {
             _verificationId = verificationId;
             _resendToken = forceResendingToken;
           });
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Code resent successfully'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Code resent successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
         },
         codeAutoRetrievalTimeout: (_) {},
       );

@@ -31,6 +31,11 @@ class EmergencyHistoryScreen extends StatefulWidget {
 class _EmergencyHistoryScreenState extends State<EmergencyHistoryScreen> {
   _HistoryFilter _filter = _HistoryFilter.all;
   EmergencyEvent? _selectedEvent;
+  // Held in a field so each rebuild (filter tap, opening details) reuses the
+  // same subscription instead of creating a fresh generator that flashes the
+  // loading spinner and re-reads prefs.
+  late final Stream<List<EmergencyEvent>> _eventsStream =
+      EmergencyHistoryService.eventsStream();
 
   @override
   void initState() {
@@ -100,7 +105,7 @@ class _EmergencyHistoryScreenState extends State<EmergencyHistoryScreen> {
 
   Widget _buildHistoryStream() {
     return StreamBuilder<List<EmergencyEvent>>(
-      stream: EmergencyHistoryService.eventsStream(),
+      stream: _eventsStream,
       builder: (context, snapshot) {
         final events = snapshot.data ?? const <EmergencyEvent>[];
         final filtered = _filteredEvents(events);

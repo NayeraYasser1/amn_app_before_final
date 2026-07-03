@@ -60,14 +60,23 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   }
 
   Future<void> _initAssistant() async {
-    await _initTts();
-    await _initSpeech();
-    _catalog = await _sync.loadCatalog();
-    await _refreshBridgeStatus();
-    if (!mounted) return;
-    setState(() {
-      _initializing = false;
-    });
+    // Any step here (TTS engine missing, catalog decode, bridge probe) can
+    // throw; without this guard a throw leaves _initializing true forever and
+    // the whole screen is stuck on "Preparing voice assistant...".
+    try {
+      await _initTts();
+      await _initSpeech();
+      _catalog = await _sync.loadCatalog();
+      await _refreshBridgeStatus();
+    } catch (e) {
+      debugPrint('Voice assistant init failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _initializing = false;
+        });
+      }
+    }
   }
 
   void _openBottomTab(int index) {
@@ -133,9 +142,15 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   }
 
   Future<void> _initTts() async {
-    await _tts.setSpeechRate(0.48);
-    await _tts.setPitch(1.0);
-    await _tts.setVolume(1.0);
+    try {
+      await _tts.setSpeechRate(0.48);
+      await _tts.setPitch(1.0);
+      await _tts.setVolume(1.0);
+    } catch (e) {
+      // Some devices have no TTS engine installed; spoken replies are then a
+      // no-op but the assistant must still start and work on-screen.
+      debugPrint('TTS init failed: $e');
+    }
   }
 
   Future<void> _speak(String text) async {
@@ -237,17 +252,36 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
 
   // Runs a suggestion chip exactly as if the user had spoken it.
   Future<void> _runTypedCommand(String command) async {
+    // Guard against a double-tap firing the same command twice (e.g. dialing
+    // or sending SOS twice).
+    if (_handlingFinalResult) return;
     if (_listening) {
       await _cancelVoice();
     }
+    _handlingFinalResult = true;
     await _tts.stop();
-    if (!mounted) return;
+    if (!mounted) {
+      _handlingFinalResult = false;
+      return;
+    }
     setState(() {
       _recognizedText = command;
       _thinking = true;
       _assistantReply = 'Processing your command...';
     });
-    await _handleCommand(command);
+    try {
+      await _handleCommand(command);
+    } catch (e) {
+      debugPrint('Voice command handling failed: $e');
+      if (mounted) {
+        setState(() {
+          _assistantReply = 'Something went wrong handling that command.';
+        });
+      }
+    } finally {
+      _handlingFinalResult = false;
+      if (mounted) setState(() => _thinking = false);
+    }
   }
 
   Future<bool> _handleLocalAppAction(
@@ -633,20 +667,31 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
     }
   }
 
-  // "Send SOS": logs an SOS event and calls the ambulance immediately —
-  // the same behaviour as holding the home-screen SOS button.
+  // "Send SOS": dials the ambulance and opens the full active-SOS screen so
+  // the same alert path as the home button runs — location resolve + SOS SMS
+  // to the default emergency contact + live timer — not just a bare dial.
   Future<bool> _sendSosByVoice() async {
-    await EmergencyHistoryService.logEvent(
-      type: 'sos',
-      title: 'SOS Sent',
-      description: 'SOS triggered by voice command',
-      status: 'In Progress',
+    unawaited(
+      EmergencyHistoryService.logEvent(
+        type: 'sos',
+        title: 'SOS Ambulance Call Started',
+        description: 'SOS triggered by voice command',
+        status: 'Started',
+      ).catchError((_) {}),
     );
     await _setAssistantReply(
-      'Sending SOS. Calling the ambulance now.',
+      'Sending SOS. Calling the ambulance and alerting your emergency contact now.',
       speak: true,
     );
     await _launchDial('123');
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const EmergencyServicesScreen(startActive: true),
+        ),
+      );
+    }
     return true;
   }
 
@@ -870,19 +915,36 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
     }
 
     final match = _findCatalogMatch(text);
-    final targets = match == null
-        ? const <String>[]
-        : ((match['targets'] as List?) ?? const [])
-              .map((e) => e.toString())
-              .toList();
+    // Unmatched speech is NEVER forwarded to the car bridge — doing so would
+    // POST arbitrary utterances to external hardware. Give a clear reply and
+    // record it as an unmatched command instead.
+    if (match == null) {
+      await _setAssistantReply(
+        'I did not understand that command. Try one of the suggestions below.',
+        speak: true,
+      );
+      unawaited(
+        EmergencyHistoryService.logEvent(
+          type: 'voice_command',
+          title: 'Voice Command (unrecognized)',
+          description: text,
+          status: 'Failed',
+        ).catchError((_) {}),
+      );
+      return;
+    }
 
-    final shouldSendToCar = match == null || targets.contains('software');
+    final targets = ((match['targets'] as List?) ?? const [])
+        .map((e) => e.toString())
+        .toList();
+
+    final shouldSendToCar = targets.contains('software');
     if (shouldSendToCar) {
       await _refreshBridgeStatus();
       if (!_bridgeConnected) {
         // The car is unreachable — fall back to the app action when the
         // command also supports the app target.
-        if (match != null && targets.contains('app')) {
+        if (targets.contains('app')) {
           final handled = await _handleLocalAppAction(match, text);
           if (handled) {
             await EmergencyHistoryService.logEvent(
@@ -895,9 +957,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
           }
         }
         await _setAssistantReply(
-          match == null
-              ? 'I could not match that locally, and the car software is not reachable right now.'
-              : 'The car software is not reachable right now. Check the Pi voice bridge connection first.',
+          'The car software is not reachable right now. Check the Pi voice bridge connection first.',
           speak: true,
         );
         return;
@@ -967,8 +1027,22 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
       _assistantReply = 'Processing your command...';
     });
 
-    await _handleCommand(_recognizedText);
-    _handlingFinalResult = false;
+    // try/finally so a throw inside a command handler (e.g. a history write
+    // that fails) cannot leave the UI stuck on "Processing..." forever with
+    // the mic permanently blocked.
+    try {
+      await _handleCommand(_recognizedText);
+    } catch (e) {
+      debugPrint('Voice command handling failed: $e');
+      if (mounted) {
+        setState(() {
+          _assistantReply = 'Something went wrong handling that command.';
+        });
+      }
+    } finally {
+      _handlingFinalResult = false;
+      if (mounted) setState(() => _thinking = false);
+    }
   }
 
   // Hard-stops listening, processing and speech output without running the

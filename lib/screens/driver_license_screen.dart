@@ -146,6 +146,35 @@ class _DriverLicenseScreenState extends State<DriverLicenseScreen> {
                         height: 220,
                         width: double.infinity,
                         fit: BoxFit.cover,
+                        // The path points at an image_picker cache file that can
+                        // be cleared by the OS or missing on another device; show
+                        // a placeholder instead of crashing the image pipeline.
+                        errorBuilder: (context, error, stack) => Container(
+                          height: 220,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[900],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(
+                                Icons.broken_image_outlined,
+                                color: Colors.white70,
+                                size: 42,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                'License photo unavailable — please add it again',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     )
                   else

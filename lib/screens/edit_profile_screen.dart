@@ -123,6 +123,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             .doc(user.uid)
             .get();
 
+        // Bail if the user left Edit Profile while the read was in flight —
+        // writing to disposed TextEditingControllers throws.
+        if (!mounted) return;
+
         if (doc.exists) {
           final data = doc.data()!;
           final carMap = data['carDetails'];
@@ -192,7 +196,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } catch (e) {
       debugPrint('EditProfileScreen._loadUserData failed: $e');
+      if (!mounted) return;
       final user = FirebaseAuth.instance.currentUser;
+      // On a load failure, leave fields EMPTY. Never seed placeholder medical
+      // data (blood type / allergies): the user could save it over their real
+      // profile, and responders would then act on fabricated information.
       _firstNameController.text = '';
       _lastNameController.text = '';
       _emailController.text = user?.email ?? '';
@@ -200,11 +208,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _plateNumberController.text = '';
       _selectedCarModel = _carModels[0];
       _selectedCarColor = _carColors[0];
-      _bloodTypeController.text = 'O+';
-      _dateOfBirthController.text = '05/05/1995';
-      _countryController.text = 'Spain';
-      _allergiesController.text = 'Penicillin';
-      _hospitalInsuranceController.text = 'Om El Maresn';
+      _bloodTypeController.text = '';
+      _dateOfBirthController.text = '';
+      _countryController.text = '';
+      _allergiesController.text = '';
+      _hospitalInsuranceController.text = '';
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not load your profile. Check your connection and try again.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {

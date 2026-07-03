@@ -21,9 +21,14 @@ class EmailVerificationScreen extends StatefulWidget {
 }
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
-  Timer? _timer;
+  // Separate handles: the 3s poller and the 1s UI ticker must each be tracked
+  // and cancelled (a single field would leak the poller, which then fires
+  // setState/navigation after dispose).
+  Timer? _pollTimer;
+  Timer? _uiTimer;
   bool _isLoading = false;
   bool _isVerified = false;
+  bool _navigated = false;
   int _secondsElapsed = 0;
   static const int _verificationTimeout = 600; // 10 minutes
 
@@ -33,15 +38,20 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     _startVerificationCheck();
   }
 
+  void _cancelTimers() {
+    _pollTimer?.cancel();
+    _uiTimer?.cancel();
+  }
+
   void _startVerificationCheck() {
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) async {
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       await _checkEmailVerification();
     });
 
     // Auto-timeout after 10 minutes
     Future.delayed(const Duration(seconds: _verificationTimeout), () {
       if (mounted && !_isVerified) {
-        _timer?.cancel();
+        _cancelTimers();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -63,7 +73,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     });
 
     // Update timer display
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _uiTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() {
           _secondsElapsed++;
@@ -73,12 +83,15 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   }
 
   Future<void> _checkEmailVerification() async {
+    if (_navigated) return;
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         await user.reload();
+        if (!mounted) return;
         if (user.emailVerified) {
-          _timer?.cancel();
+          _cancelTimers();
+          _navigated = true;
           setState(() {
             _isVerified = true;
           });
@@ -168,7 +181,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _cancelTimers();
     super.dispose();
   }
 

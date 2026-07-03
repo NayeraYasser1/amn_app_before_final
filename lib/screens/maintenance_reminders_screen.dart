@@ -227,7 +227,12 @@ class _MaintenanceRemindersScreenState
     );
 
     final title = titleController.text.trim();
-    titleController.dispose();
+    // Dispose after the dialog's exit animation; the TextField is still bound
+    // to this controller while the route animates out.
+    Future.delayed(
+      const Duration(milliseconds: 400),
+      titleController.dispose,
+    );
     if (saved != true) return;
     final entry = {
       'title': title,

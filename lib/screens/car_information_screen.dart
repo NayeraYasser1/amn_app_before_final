@@ -227,6 +227,25 @@ class _CarInformationScreenState extends State<CarInformationScreen> {
                           height: 160,
                           width: double.infinity,
                           fit: BoxFit.cover,
+                          // The cache path may be gone (OS cleanup / reinstall /
+                          // another device); show a placeholder, don't crash.
+                          errorBuilder: (context, error, stack) => Container(
+                            height: 160,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[900],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'License photo unavailable — please add it again',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     const SizedBox(height: 40),

@@ -33,8 +33,14 @@ void main() async {
     if (e.code != 'duplicate-app') rethrow;
   }
 
-  // Step 3: Start the Android call bridge when available
-  await AndroidCallBridgeService.instance.start();
+  // Step 3: Start the Android call bridge when available. This must never block
+  // app startup, so any native/platform-channel failure here is swallowed —
+  // the bridge is optional and can be retried from its status screen.
+  try {
+    await AndroidCallBridgeService.instance.start();
+  } catch (e) {
+    debugPrint('Android call bridge start failed: $e');
+  }
 
   // Step 4: Run the app
   runApp(const MyApp());

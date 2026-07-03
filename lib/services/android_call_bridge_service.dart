@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -27,11 +28,28 @@ class AndroidCallBridgeService {
   Future<Map<String, dynamic>> restartBridge() async {
     final prefs = await SharedPreferences.getInstance();
     final port = prefs.getInt(_portKey) ?? 8765;
-    final token = prefs.getString(_tokenKey) ?? '';
+    final token = await _ensureToken(prefs);
     return _invokeNative(
       'startNativeBridge',
       <String, dynamic>{'port': port, 'token': token},
     );
+  }
+
+  /// Returns the bridge auth token, generating and persisting a strong random
+  /// one on first run. Without a non-blank token the native server treats every
+  /// request as authorized, so any co-resident app could POST /answer, /end etc.
+  /// to the loopback port and control the user's calls. Requiring a token that
+  /// never leaves the device closes that hole.
+  Future<String> _ensureToken(SharedPreferences prefs) async {
+    final existing = prefs.getString(_tokenKey);
+    if (existing != null && existing.isNotEmpty) return existing;
+    final rng = Random.secure();
+    final token = List<String>.generate(
+      32,
+      (_) => rng.nextInt(16).toRadixString(16),
+    ).join();
+    await prefs.setString(_tokenKey, token);
+    return token;
   }
 
   Future<Map<String, dynamic>> stopBridge() async {

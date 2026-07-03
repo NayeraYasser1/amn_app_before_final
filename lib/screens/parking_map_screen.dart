@@ -155,7 +155,13 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
         );
       },
     );
-    controller.dispose();
+    // Dispose after the dialog's exit animation finishes; the TextField is
+    // still bound to this controller while the route animates out, so an
+    // immediate dispose triggers a "used after being disposed" assertion.
+    Future.delayed(
+      const Duration(milliseconds: 400),
+      controller.dispose,
+    );
     if (result == null || !mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -274,6 +280,12 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
         return;
       }
 
+      // A 12s high-accuracy fix can time out (e.g. entering a garage) and fall
+      // back to the last known position, which may be minutes and kilometres
+      // stale. Warn the user rather than silently pinning the wrong spot.
+      final fixAge = DateTime.now().difference(position.timestamp);
+      final isStale = fixAge.inMinutes >= 2;
+
       final savedLocation = _SavedParkingLocation(
         latitude: position.latitude,
         longitude: position.longitude,
@@ -303,6 +315,12 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
       });
 
       await _openSavedPinInGoogleMaps();
+      if (isStale && mounted) {
+        _showMessage(
+          'Saved, but this GPS fix may be a few minutes old. If the pin looks '
+          'wrong, recenter on the map and save again.',
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       _showMessage('Unable to save parking location. Please try again.');

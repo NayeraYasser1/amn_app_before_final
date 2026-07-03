@@ -68,6 +68,12 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
 
   // Automatic SOS alert SMS to the first contact and first hospital.
   bool _alertsTriggered = false;
+  // Set true once the user taps "I am safe" so a still-pending deferred alert
+  // does not fire after they've cancelled the emergency.
+  bool _sosCancelled = false;
+  // True when no emergency contact is saved, so the SOS could not text anyone —
+  // shown to the user instead of silently sending nothing.
+  bool _noSosContact = false;
   String _alertMessage = '';
   String? _contactAlertLabel;
   String? _contactAlertPhone;
@@ -159,12 +165,17 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
     // never block/delay the alert. _sendSosAlerts guards against double
     // sending and includes the location link only if it is ready by then.
     final locationAttempt = _resolveLocation();
+    // Wait for the location attempt (which itself caps at ~10s and falls back
+    // to the last known fix) before sending, with a hard 12s ceiling so a
+    // hanging GPS can never block the alert. Aligning the deadline with the
+    // location timeout means the SMS usually carries real coordinates instead
+    // of racing ahead and reporting "GPS unavailable".
     unawaited(
       Future.any([
         locationAttempt,
-        Future<void>.delayed(const Duration(seconds: 8)),
+        Future<void>.delayed(const Duration(seconds: 12)),
       ]).whenComplete(() {
-        if (mounted) unawaited(_sendSosAlerts());
+        if (mounted && !_sosCancelled) unawaited(_sendSosAlerts());
       }),
     );
 
@@ -264,7 +275,7 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
   /// saved hospital — silently, in the background, so the 123 call is not
   /// interrupted. Runs once per SOS.
   Future<void> _sendSosAlerts() async {
-    if (_alertsTriggered) return;
+    if (_alertsTriggered || _sosCancelled) return;
     _alertsTriggered = true;
 
     final link = _locationLink;
@@ -277,6 +288,7 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
     final hospital = await SosAlertService.firstHospital();
     if (!mounted) return;
     setState(() {
+      _noSosContact = contact == null;
       if (contact != null) {
         final relation = (contact['relationship'] ?? '').trim();
         _contactAlertLabel = relation.isEmpty
@@ -302,12 +314,9 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
           () => _contactAlertState = ok ? _AlertState.sent : _AlertState.failed,
         );
       }
-      if (!ok && mounted) {
-        // The silent send failed (permission denied / no SIM / airplane mode).
-        // Open the Messages composer prefilled so the primary contact is still
-        // alerted instead of the failure being silent.
-        await _openSmsComposer(contact['phone']);
-      }
+      // On failure we do NOT auto-launch the Messages composer: that would
+      // steal the foreground away from the live 123 call. The failed alert row
+      // is tappable ("tap to open Messages") so the user can send it when ready.
       unawaited(
         EmergencyHistoryService.logEvent(
           type: 'sos',
@@ -459,6 +468,9 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
   }
 
   Future<void> _endSos() async {
+    // Stop any SOS alert that is still waiting on the location deadline from
+    // firing after the user has said they are safe.
+    _sosCancelled = true;
     _elapsedTimer?.cancel();
     unawaited(
       EmergencyHistoryService.logEvent(
@@ -506,33 +518,76 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: _bg,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-        systemNavigationBarColor: _bg,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: _bg,
-        body: SafeArea(
-          bottom: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-            children: [
-              _SosHeader(title: _titleForStage),
-              const SizedBox(height: 18),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: _buildStage(),
-              ),
-            ],
-          ),
+    return PopScope(
+      // While an SOS is active, confirm before leaving so a stray back gesture
+      // doesn't silently abandon the emergency (timers, alert state).
+      canPop: _stage != _SosStage.active,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        // Capture the Navigator before the await so no BuildContext is used
+        // across the async gap.
+        final navigator = Navigator.of(context);
+        final leave = await _confirmLeaveActiveSos();
+        if (!leave) return;
+        navigator.popUntil((route) => route.isFirst);
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: _bg,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+          systemNavigationBarColor: _bg,
+          systemNavigationBarIconBrightness: Brightness.light,
         ),
-        bottomNavigationBar: _SosBottomNavigationBar(onTap: _openBottomTab),
+        child: Scaffold(
+          backgroundColor: _bg,
+          body: SafeArea(
+            bottom: false,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+              children: [
+                _SosHeader(title: _titleForStage),
+                const SizedBox(height: 18),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: _buildStage(),
+                ),
+              ],
+            ),
+          ),
+          bottomNavigationBar: _SosBottomNavigationBar(onTap: _openBottomTab),
+        ),
       ),
     );
+  }
+
+  Future<bool> _confirmLeaveActiveSos() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _card,
+        title: const Text(
+          'Leave the active SOS?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Your SOS is still active. If you leave, the live timer and alert '
+          'status will be lost. Use "I am safe" to end it properly.',
+          style: TextStyle(color: _muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Stay'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Leave', style: TextStyle(color: _red)),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   String get _titleForStage {
@@ -566,6 +621,7 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
           position: _position,
           address: _address,
           contacts: _contacts,
+          noSosContact: _noSosContact,
           contactAlertLabel: _contactAlertLabel,
           contactAlertState: _contactAlertState,
           hospitalAlertLabel: _hospitalAlertLabel,
@@ -716,6 +772,7 @@ class _ActiveStage extends StatelessWidget {
   final Position? position;
   final String? address;
   final List<Map<String, dynamic>> contacts;
+  final bool noSosContact;
   final String? contactAlertLabel;
   final _AlertState? contactAlertState;
   final String? hospitalAlertLabel;
@@ -742,6 +799,7 @@ class _ActiveStage extends StatelessWidget {
     required this.position,
     required this.address,
     required this.contacts,
+    required this.noSosContact,
     required this.contactAlertLabel,
     required this.contactAlertState,
     required this.hospitalAlertLabel,
@@ -859,6 +917,31 @@ class _ActiveStage extends StatelessWidget {
                   label: hospitalAlertLabel ?? '',
                   state: hospitalAlertState!,
                   onTapWhenFailed: onHospitalAlertRetry,
+                ),
+              ],
+              if (noSosContact) ...[
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orangeAccent,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'No emergency contact is saved, so no SOS SMS was sent. '
+                        'Add one in Safety Hub so your contact is alerted next time.',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],

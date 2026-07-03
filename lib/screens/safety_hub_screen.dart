@@ -549,6 +549,10 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
   bool _contactFormDefault = false;
   bool _hospitalFormDefault = false;
 
+  // Guards against a double-tap on Save (during the stage transition) adding
+  // the same contact/hospital twice.
+  bool _committingForm = false;
+
   @override
   void initState() {
     super.initState();
@@ -620,34 +624,11 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
     List<_EmergencyContact> contacts;
     final rawContacts = prefs.getString(_contactsKey);
     if (rawContacts == null || rawContacts.isEmpty) {
-      // NOTE: must be a growable list (not const) so add/edit/delete work.
-      contacts = [
-        const _EmergencyContact(
-          name: 'Nayera',
-          phone: '01012345678',
-          relationship: 'Mom',
-        ),
-        const _EmergencyContact(
-          name: 'Amir',
-          phone: '01023456789',
-          relationship: 'Dad',
-        ),
-        const _EmergencyContact(
-          name: 'Hussein',
-          phone: '01098765432',
-          relationship: 'Husband',
-        ),
-        const _EmergencyContact(
-          name: 'Marian',
-          phone: '01234567890',
-          relationship: 'Best friend',
-        ),
-        const _EmergencyContact(
-          name: 'Shady',
-          phone: '01112223333',
-          relationship: 'Neighbour',
-        ),
-      ];
+      // Start empty. We must NOT seed placeholder people here: those seeds get
+      // persisted as real contacts and the SOS flow would then silently text a
+      // made-up number that may belong to a real stranger. The user adds their
+      // own contacts. (Growable list so add/edit/delete work.)
+      contacts = <_EmergencyContact>[];
     } else {
       contacts = _decodeList(rawContacts)
           .map(_EmergencyContact.fromMap)
@@ -883,6 +864,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
   // -------------------------------------------------------------------------
 
   void _openContactForm({int? editIndex}) {
+    _committingForm = false;
     _editingContactIndex = editIndex;
     if (editIndex != null) {
       final contact = _contacts[editIndex];
@@ -901,6 +883,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
   }
 
   Future<void> _saveContactForm() async {
+    if (_committingForm) return;
     final name = _contactNameCtrl.text.trim();
     final phone = _contactPhoneCtrl.text.trim();
     final relationship = _contactRelationCtrl.text.trim();
@@ -909,6 +892,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       _showMessage('Please enter both a name and a phone number.');
       return;
     }
+    _committingForm = true;
 
     final contact = _EmergencyContact(
       name: name,
@@ -938,6 +922,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       _stage = _SafetyHubStage.contacts;
     });
     await _saveContacts();
+    _committingForm = false;
     if (!mounted) return;
     _showMessage(
       _editingContactIndex != null ? 'Contact updated.' : 'Contact added.',
@@ -984,6 +969,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
   // -------------------------------------------------------------------------
 
   void _openHospitalForm({int? editIndex}) {
+    _committingForm = false;
     _editingHospitalIndex = editIndex;
     if (editIndex != null) {
       final hospital = _hospitals[editIndex];
@@ -1037,6 +1023,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
   }
 
   Future<void> _saveHospitalForm() async {
+    if (_committingForm) return;
     final name = _hospitalNameCtrl.text.trim();
     final phone = _hospitalPhoneCtrl.text.trim();
     final address = _hospitalAddressCtrl.text.trim();
@@ -1045,6 +1032,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       _showMessage('Please enter both a hospital name and a phone number.');
       return;
     }
+    _committingForm = true;
 
     final hospital = _Hospital(
       name: name,
@@ -1076,6 +1064,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       _stage = _SafetyHubStage.hospitals;
     });
     await _saveHospitals();
+    _committingForm = false;
     if (!mounted) return;
     _showMessage(
       _editingHospitalIndex != null ? 'Hospital updated.' : 'Hospital added.',

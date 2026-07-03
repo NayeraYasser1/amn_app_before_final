@@ -66,6 +66,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           }
         },
         codeSent: (verificationId, forceResendingToken) {
+          // The SMS dispatch can arrive seconds later; if the user left the
+          // screen, the context is deactivated and pushNamed would throw.
+          if (!mounted) return;
           Navigator.pushNamed(
             context,
             'verify-code',

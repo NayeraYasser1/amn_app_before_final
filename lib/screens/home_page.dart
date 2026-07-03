@@ -32,6 +32,23 @@ const Color _muted = Color(0xFFB7BABF);
 const String _ambulanceNumber = '123';
 const int _sosHoldSeconds = 3;
 
+// Real current date/time for the home header (computed each build) instead of
+// a hardcoded "May 10 - 10:30 AM - BMW iX - Connected" string that was shown as
+// if it were live status.
+String _homeDateLabel() {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  final now = DateTime.now();
+  final weekday = weekdays[now.weekday - 1];
+  final hour12 = now.hour % 12 == 0 ? 12 : now.hour % 12;
+  final minute = now.minute.toString().padLeft(2, '0');
+  final period = now.hour >= 12 ? 'PM' : 'AM';
+  return '$weekday, ${months[now.month - 1]} ${now.day} • $hour12:$minute $period';
+}
+
 class HomePage extends StatefulWidget {
   final void Function(Locale)? onLocaleChanged;
 
@@ -42,7 +59,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String _userName = 'Nayera';
+  String _userName = 'there';
   Timer? _sosHoldTimer;
   bool _isHoldingSos = false;
   bool _suppressNextSosTap = false;
@@ -123,7 +140,7 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _userName =
             user.displayName ??
-            (user.email?.split('@')[0].capitalize() ?? 'Nayera');
+            (user.email?.split('@')[0].capitalize() ?? 'there');
       });
     }
   }
@@ -859,11 +876,11 @@ class _HomeHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 9),
-              const Text(
-                'May 10 \u2022 10:30 AM   BMW iX \u2022 Connected',
+              Text(
+                _homeDateLabel(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   color: _muted,
                   fontSize: 13,
                   height: 1.1,
