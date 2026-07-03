@@ -944,6 +944,18 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
     _editingContactIndex = null;
   }
 
+  Future<void> _setDefaultContact(int index) async {
+    if (index < 0 || index >= _contacts.length) return;
+    setState(() {
+      for (var i = 0; i < _contacts.length; i++) {
+        _contacts[i] = _contacts[i].copyWith(isDefault: i == index);
+      }
+    });
+    await _saveContacts();
+    if (!mounted) return;
+    _showMessage('${_contacts[index].name} is now the SOS default contact.');
+  }
+
   Future<void> _deleteContact(int index) async {
     final contact = _contacts[index];
     final confirmed = await _confirmDelete(
@@ -1068,6 +1080,20 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       _editingHospitalIndex != null ? 'Hospital updated.' : 'Hospital added.',
     );
     _editingHospitalIndex = null;
+  }
+
+  Future<void> _setDefaultHospital(int index) async {
+    if (index < 0 || index >= _hospitals.length) return;
+    setState(() {
+      for (var i = 0; i < _hospitals.length; i++) {
+        _hospitals[i] = _hospitals[i].copyWith(isDefault: i == index);
+      }
+    });
+    await _saveHospitals();
+    if (!mounted) return;
+    _showMessage(
+      '${_hospitals[index].name} is now the SOS default hospital.',
+    );
   }
 
   Future<void> _deleteHospital(int index) async {
@@ -1393,6 +1419,8 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
               onEdit: () =>
                   _openContactForm(editIndex: _contacts.indexOf(visible[i])),
               onDelete: () => _deleteContact(_contacts.indexOf(visible[i])),
+              onSetDefault: () =>
+                  _setDefaultContact(_contacts.indexOf(visible[i])),
             ),
             if (i != visible.length - 1) const SizedBox(height: 10),
           ],
@@ -1503,6 +1531,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
               onDirections: () => _openHospitalDirections(_hospitals[i]),
               onEdit: () => _openHospitalForm(editIndex: i),
               onDelete: () => _deleteHospital(i),
+              onSetDefault: () => _setDefaultHospital(i),
             ),
             if (i != _hospitals.length - 1) const SizedBox(height: 10),
           ],
@@ -1939,12 +1968,14 @@ class _ContactCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onSetDefault;
 
   const _ContactCard({
     required this.contact,
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
+    required this.onSetDefault,
   });
 
   @override
@@ -2036,11 +2067,24 @@ class _ContactCard extends StatelessWidget {
                   ),
                   color: _cardRaised,
                   onSelected: (value) {
+                    if (value == 'default') onSetDefault();
                     if (value == 'edit') onEdit();
                     if (value == 'delete') onDelete();
                   },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
+                  itemBuilder: (context) => [
+                    if (!contact.isDefault)
+                      const PopupMenuItem(
+                        value: 'default',
+                        child: Row(
+                          children: [
+                            Icon(Icons.sos, color: _red, size: 17),
+                            SizedBox(width: 9),
+                            Text('Set as default',
+                                style: TextStyle(color: Colors.white)),
+                          ],
+                        ),
+                      ),
+                    const PopupMenuItem(
                       value: 'edit',
                       child: Row(
                         children: [
@@ -2051,7 +2095,7 @@ class _ContactCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    PopupMenuItem(
+                    const PopupMenuItem(
                       value: 'delete',
                       child: Row(
                         children: [
@@ -2078,6 +2122,7 @@ class _HospitalCard extends StatelessWidget {
   final VoidCallback onDirections;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onSetDefault;
 
   const _HospitalCard({
     required this.hospital,
@@ -2085,6 +2130,7 @@ class _HospitalCard extends StatelessWidget {
     required this.onDirections,
     required this.onEdit,
     required this.onDelete,
+    required this.onSetDefault,
   });
 
   @override
@@ -2145,11 +2191,24 @@ class _HospitalCard extends StatelessWidget {
                       ),
                       color: _cardRaised,
                       onSelected: (value) {
+                        if (value == 'default') onSetDefault();
                         if (value == 'edit') onEdit();
                         if (value == 'delete') onDelete();
                       },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(
+                      itemBuilder: (context) => [
+                        if (!hospital.isDefault)
+                          const PopupMenuItem(
+                            value: 'default',
+                            child: Row(
+                              children: [
+                                Icon(Icons.sos, color: _red, size: 17),
+                                SizedBox(width: 9),
+                                Text('Set as default',
+                                    style: TextStyle(color: Colors.white)),
+                              ],
+                            ),
+                          ),
+                        const PopupMenuItem(
                           value: 'edit',
                           child: Row(
                             children: [
@@ -2161,7 +2220,7 @@ class _HospitalCard extends StatelessWidget {
                             ],
                           ),
                         ),
-                        PopupMenuItem(
+                        const PopupMenuItem(
                           value: 'delete',
                           child: Row(
                             children: [
