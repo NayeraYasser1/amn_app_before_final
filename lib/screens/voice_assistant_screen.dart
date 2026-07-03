@@ -309,8 +309,10 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
         screen = const EngineStatusScreen();
         break;
       case 'open_parking_map':
-      case 'save_parking':
         screen = const ParkingMapScreen();
+        break;
+      case 'save_parking':
+        screen = const ParkingMapScreen(startOnSave: true);
         break;
       case 'open_safety_hub':
         screen = const SafetyHubScreen();

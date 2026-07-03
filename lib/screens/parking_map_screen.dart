@@ -39,7 +39,16 @@ class _SavedParkingLocation {
 class ParkingMapScreen extends StatefulWidget {
   final void Function(Locale)? onLocaleChanged;
 
-  const ParkingMapScreen({super.key, this.onLocaleChanged});
+  /// Open on the save stage even when a spot is already saved (used by the
+  /// voice "save parking" intent). By default the screen opens on Find My
+  /// Car whenever a saved spot exists.
+  final bool startOnSave;
+
+  const ParkingMapScreen({
+    super.key,
+    this.onLocaleChanged,
+    this.startOnSave = false,
+  });
 
   @override
   State<ParkingMapScreen> createState() => _ParkingMapScreenState();
@@ -87,6 +96,9 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
         savedAt: savedAt ?? DateTime.now(),
       );
       _note = (note != null && note.isNotEmpty) ? note : null;
+      // A spot is already saved — open on Find My Car so returning users
+      // see their pinned parking instead of being asked to save again.
+      if (!widget.startOnSave) _stage = _ParkingStage.find;
     });
 
     await _refreshCurrentPosition(showErrors: false);
@@ -443,9 +455,10 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
           currentPosition: _currentPosition,
           distanceMeters: _distanceToCarMeters,
           note: _note,
-          onBack: () => _setStage(_ParkingStage.saved),
+          onBack: () => Navigator.pop(context),
           onNavigate: _openNavigationToCar,
           onViewMap: _openSavedPinInGoogleMaps,
+          onSaveNew: () => _setStage(_ParkingStage.save),
           onDeleteNote: _deleteNote,
         );
       case _ParkingStage.navigate:
@@ -753,6 +766,7 @@ class _FindMyCarStage extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onNavigate;
   final VoidCallback onViewMap;
+  final VoidCallback onSaveNew;
 
   const _FindMyCarStage({
     super.key,
@@ -764,6 +778,7 @@ class _FindMyCarStage extends StatelessWidget {
     required this.onBack,
     required this.onNavigate,
     required this.onViewMap,
+    required this.onSaveNew,
   });
 
   @override
@@ -823,6 +838,11 @@ class _FindMyCarStage extends StatelessWidget {
           _SecondaryButton(
             text: 'Open Pin in Google Maps',
             onPressed: onViewMap,
+          ),
+          const SizedBox(height: 12),
+          _SecondaryButton(
+            text: 'Save New Parking (I re-parked)',
+            onPressed: onSaveNew,
           ),
         ],
       ),
