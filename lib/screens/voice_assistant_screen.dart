@@ -16,10 +16,8 @@ import '../services/usage_logger.dart';
 import '../services/voice_command_sync_service.dart';
 import 'engine_status_screen.dart';
 import 'edit_profile_screen.dart';
-import 'emergency_contacts_screen.dart';
 import 'emergency_history_screen.dart';
 import 'emergency_services_screen.dart';
-import 'hospital_insurance_screen.dart';
 import 'home_page.dart';
 import 'maintenance_reminders_screen.dart';
 import 'map_picker_screen.dart';
@@ -316,10 +314,12 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
         screen = const EditProfileScreen();
         break;
       case 'open_emergency_contacts':
-        screen = const EmergencyContactsScreen();
+        // Route to the live Safety Hub (same data the SOS button uses) rather
+        // than the legacy screen, which stored contacts under a different key.
+        screen = const SafetyHubScreen(initialSection: 'contacts');
         break;
       case 'open_hospital_insurance':
-        screen = const HospitalInsuranceScreen();
+        screen = const SafetyHubScreen(initialSection: 'hospitals');
         break;
       case 'open_pairing':
         screen = const PairingUnpairedScreen();
