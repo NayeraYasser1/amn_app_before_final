@@ -145,7 +145,10 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
             ElevatedButton(
               onPressed: () =>
                   Navigator.pop(dialogContext, controller.text.trim()),
-              style: ElevatedButton.styleFrom(backgroundColor: _blue),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _blue,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Save note'),
             ),
           ],
