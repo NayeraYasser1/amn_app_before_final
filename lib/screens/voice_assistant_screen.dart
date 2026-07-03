@@ -148,9 +148,15 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
       // an engine that repeatedly disconnects (DeadObjectException) and never
       // actually speaks; Google TTS is far more reliable.
       try {
-        final engines = await _tts.getEngines;
-        if (engines is List && engines.contains('com.google.android.tts')) {
-          await _tts.setEngine('com.google.android.tts');
+        // Only switch engines when the device default is NOT already Google.
+        // Re-binding an already-Google engine disturbs the shared audio path
+        // and can make the very next speech-recognition start fail.
+        final current = (await _tts.getDefaultEngine)?.toString();
+        if (current != 'com.google.android.tts') {
+          final engines = await _tts.getEngines;
+          if (engines is List && engines.contains('com.google.android.tts')) {
+            await _tts.setEngine('com.google.android.tts');
+          }
         }
       } catch (_) {}
       await _tts.setSpeechRate(0.48);
@@ -1116,9 +1122,37 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
       _listening = true;
     });
 
-    bool started;
+    bool started = await _beginListenSession();
+    if (!started && mounted) {
+      // The device recognizer sometimes rejects the first start when a previous
+      // session (or a just-spoken reply) is still releasing the microphone.
+      // Reset and try once more before telling the user it failed.
+      try {
+        await _speech.cancel();
+      } catch (_) {}
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+      started = await _beginListenSession();
+    }
+
+    if (!mounted) return;
+    if (started) {
+      UsageLogger.logAction('voice_assistant_start');
+    } else {
+      setState(() => _listening = false);
+      await _setAssistantReply(
+        'I could not start listening. Please try again.',
+        speak: true,
+      );
+    }
+  }
+
+  /// Starts one speech-recognition session. Returns true when the recognizer
+  /// actually began listening. Extracted so the caller can retry on a transient
+  /// start failure.
+  Future<bool> _beginListenSession() async {
     try {
-      started = await _speech.listen(
+      return await _speech.listen(
         onResult: (result) {
           if (!mounted) return;
           setState(() {
@@ -1138,20 +1172,10 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
           listenMode: stt.ListenMode.confirmation,
         ),
       );
-    } catch (_) {
+    } catch (e) {
       // A plugin exception must not strand the mic in the listening state.
-      started = false;
-    }
-
-    if (!mounted) return;
-    if (started) {
-      UsageLogger.logAction('voice_assistant_start');
-    } else {
-      setState(() => _listening = false);
-      await _setAssistantReply(
-        'I could not start listening. Please try again.',
-        speak: true,
-      );
+      debugPrint('speech listen() failed to start: $e');
+      return false;
     }
   }
 
