@@ -158,28 +158,48 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
         .trim();
   }
 
-  String _patternFromPhrase(String phrase) {
-    final placeholder = RegExp(r'\[(\w+)\]');
-    const slotMarker = 'slotmarker';
-    final normalized = _normalize(phrase.replaceAll(placeholder, slotMarker));
-    return RegExp.escape(
-      normalized,
-    ).replaceAll(slotMarker, '(.+)').replaceAll(' ', r'\s+');
+  // Compiled patterns are cached so we don't rebuild a RegExp for every phrase
+  // of every command on each recognized utterance.
+  final Map<String, RegExp> _patternCache = {};
+
+  RegExp _compiledPattern(String phrase) {
+    return _patternCache.putIfAbsent(phrase, () {
+      final placeholder = RegExp(r'\[(\w+)\]');
+      const slotMarker = 'slotmarker';
+      final normalized = _normalize(phrase.replaceAll(placeholder, slotMarker));
+      final body = RegExp.escape(normalized)
+          .replaceAll(slotMarker, '(.+)')
+          .replaceAll(' ', r'\s+');
+      // Anchored so a command matches the whole utterance, not a fragment of
+      // an unrelated sentence.
+      return RegExp('^$body\$');
+    });
   }
+
+  bool _phraseHasSlot(String phrase) => phrase.contains('[');
 
   Map<String, dynamic>? _findCatalogMatch(String recognized) {
     final normalized = _normalize(recognized);
+    Map<String, dynamic>? best;
+    var bestScore = -1;
     for (final item in _catalog) {
       final phrases = (item['phrases'] as List?) ?? const [];
       for (final phrase in phrases) {
         final rawPhrase = phrase.toString();
-        final pattern = _patternFromPhrase(rawPhrase);
-        if (RegExp(pattern).hasMatch(normalized)) {
-          return item;
+        if (!_compiledPattern(rawPhrase).hasMatch(normalized)) continue;
+        // Prefer the most specific phrase: an exact (no-slot) phrase beats a
+        // slotted one, and among equals the longest literal wins. This stops
+        // a generic "call [name]" from shadowing a specific "call police",
+        // regardless of catalog order.
+        final score =
+            (_phraseHasSlot(rawPhrase) ? 0 : 100000) + rawPhrase.length;
+        if (score > bestScore) {
+          bestScore = score;
+          best = item;
         }
       }
     }
-    return null;
+    return best;
   }
 
   // Extracts the first [slot] value (e.g. the name in "call [name]") from the
@@ -188,8 +208,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
     final normalized = _normalize(recognized);
     final phrases = (item['phrases'] as List?) ?? const [];
     for (final phrase in phrases) {
-      final pattern = _patternFromPhrase(phrase.toString());
-      final match = RegExp(pattern).firstMatch(normalized);
+      final match = _compiledPattern(phrase.toString()).firstMatch(normalized);
       if (match != null && match.groupCount >= 1) {
         final value = match.group(1)?.trim();
         if (value != null && value.isNotEmpty) return value;
@@ -352,12 +371,21 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   }
 
   Future<void> _launchDial(String number) async {
+    var launched = false;
     try {
-      await launchUrl(
+      launched = await launchUrl(
         Uri(scheme: 'tel', path: number),
         mode: LaunchMode.externalApplication,
       );
     } catch (_) {}
+    // Surface a failure instead of silently pretending the call started —
+    // critical for emergency numbers.
+    if (!launched) {
+      await _setAssistantReply(
+        'I could not open the dialer. Please dial $number yourself.',
+        speak: true,
+      );
+    }
   }
 
   // Speaks a confirmation and opens the dialer with an emergency number.
@@ -1002,26 +1030,32 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
       _listening = true;
     });
 
-    final started = await _speech.listen(
-      onResult: (result) {
-        if (!mounted) return;
-        setState(() {
-          _recognizedText = result.recognizedWords;
-        });
-        // Commands run only on the FINAL result — never on partial text, so
-        // a long sentence is never cut off half-way.
-        if (result.finalResult) {
-          _maybeHandleFinalUtterance();
-        }
-      },
-      listenFor: const Duration(seconds: 12),
-      pauseFor: const Duration(seconds: 2),
-      listenOptions: stt.SpeechListenOptions(
-        cancelOnError: true,
-        partialResults: true,
-        listenMode: stt.ListenMode.confirmation,
-      ),
-    );
+    bool started;
+    try {
+      started = await _speech.listen(
+        onResult: (result) {
+          if (!mounted) return;
+          setState(() {
+            _recognizedText = result.recognizedWords;
+          });
+          // Commands run only on the FINAL result — never on partial text, so
+          // a long sentence is never cut off half-way.
+          if (result.finalResult) {
+            _maybeHandleFinalUtterance();
+          }
+        },
+        listenFor: const Duration(seconds: 12),
+        pauseFor: const Duration(seconds: 2),
+        listenOptions: stt.SpeechListenOptions(
+          cancelOnError: true,
+          partialResults: true,
+          listenMode: stt.ListenMode.confirmation,
+        ),
+      );
+    } catch (_) {
+      // A plugin exception must not strand the mic in the listening state.
+      started = false;
+    }
 
     if (!mounted) return;
     if (started) {
@@ -1037,8 +1071,10 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
 
   @override
   void dispose() {
+    // cancel() hard-aborts the recognizer on teardown; stop() would try to
+    // finalize and can emit a late result after the widget is gone.
     _tts.stop();
-    _speech.stop();
+    _speech.cancel();
     super.dispose();
   }
 
