@@ -57,34 +57,41 @@ class SosAlertService {
     return [];
   }
 
-  /// First contact from the Safety Hub list (same seed fallback the Safety
-  /// Hub and voice assistant use before the user saves their own).
+  /// The Safety Hub contact marked as the SOS default (falling back to the
+  /// first contact, then to the seed used before the user saves their own).
   static Future<Map<String, String>?> firstEmergencyContact() async {
     final prefs = await SharedPreferences.getInstance();
     final contacts = _decodeList(prefs.getString('safety_hub_contacts_json'));
     if (contacts.isEmpty) {
       return {'name': 'Nayera', 'phone': '01012345678', 'relationship': 'Mom'};
     }
-    final first = contacts.first;
-    final phone = (first['phone'] ?? '').toString().trim();
+    final chosen = contacts.firstWhere(
+      (c) => c['default'] == true,
+      orElse: () => contacts.first,
+    );
+    final phone = (chosen['phone'] ?? '').toString().trim();
     if (phone.isEmpty) return null;
     return {
-      'name': (first['name'] ?? '').toString(),
+      'name': (chosen['name'] ?? '').toString(),
       'phone': phone,
-      'relationship': (first['relationship'] ?? '').toString(),
+      'relationship': (chosen['relationship'] ?? '').toString(),
     };
   }
 
-  /// First hospital from the Safety Hub list (seed fallback: El Salam).
+  /// The Safety Hub hospital marked as the SOS default (falling back to the
+  /// first hospital, then to the El Salam seed).
   static Future<Map<String, String>?> firstHospital() async {
     final prefs = await SharedPreferences.getInstance();
     final hospitals = _decodeList(prefs.getString('safety_hub_hospitals_json'));
     if (hospitals.isEmpty) {
       return {'name': 'El Salam Hospital', 'phone': '19885'};
     }
-    final first = hospitals.first;
-    final phone = (first['phone'] ?? '').toString().trim();
+    final chosen = hospitals.firstWhere(
+      (h) => h['default'] == true,
+      orElse: () => hospitals.first,
+    );
+    final phone = (chosen['phone'] ?? '').toString().trim();
     if (phone.isEmpty) return null;
-    return {'name': (first['name'] ?? '').toString(), 'phone': phone};
+    return {'name': (chosen['name'] ?? '').toString(), 'phone': phone};
   }
 }

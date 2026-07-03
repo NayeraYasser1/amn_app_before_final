@@ -45,16 +45,29 @@ class _EmergencyContact {
   final String phone;
   final String relationship;
 
+  /// The default contact is the one the SOS button sends the emergency SMS
+  /// to. Exactly one contact is default at any time.
+  final bool isDefault;
+
   const _EmergencyContact({
     required this.name,
     required this.phone,
     required this.relationship,
+    this.isDefault = false,
   });
+
+  _EmergencyContact copyWith({bool? isDefault}) => _EmergencyContact(
+    name: name,
+    phone: phone,
+    relationship: relationship,
+    isDefault: isDefault ?? this.isDefault,
+  );
 
   Map<String, dynamic> toMap() => {
     'name': name,
     'phone': phone,
     'relationship': relationship,
+    'default': isDefault,
   };
 
   factory _EmergencyContact.fromMap(Map<String, dynamic> map) {
@@ -62,6 +75,7 @@ class _EmergencyContact {
       name: (map['name'] ?? '').toString(),
       phone: (map['phone'] ?? '').toString(),
       relationship: (map['relationship'] ?? '').toString(),
+      isDefault: map['default'] == true,
     );
   }
 }
@@ -73,13 +87,27 @@ class _Hospital {
   final double? latitude;
   final double? longitude;
 
+  /// The default hospital is the one the SOS button sends the emergency SMS
+  /// to. Exactly one hospital is default at any time.
+  final bool isDefault;
+
   const _Hospital({
     required this.name,
     required this.phone,
     required this.address,
     this.latitude,
     this.longitude,
+    this.isDefault = false,
   });
+
+  _Hospital copyWith({bool? isDefault}) => _Hospital(
+    name: name,
+    phone: phone,
+    address: address,
+    latitude: latitude,
+    longitude: longitude,
+    isDefault: isDefault ?? this.isDefault,
+  );
 
   Map<String, dynamic> toMap() => {
     'name': name,
@@ -87,6 +115,7 @@ class _Hospital {
     'address': address,
     'latitude': latitude,
     'longitude': longitude,
+    'default': isDefault,
   };
 
   factory _Hospital.fromMap(Map<String, dynamic> map) {
@@ -96,6 +125,7 @@ class _Hospital {
       address: (map['address'] ?? '').toString(),
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),
+      isDefault: map['default'] == true,
     );
   }
 }
@@ -514,6 +544,10 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
   double? _pickedLng;
   int? _editingHospitalIndex;
 
+  // "Default for SOS" switches in the add/edit forms.
+  bool _contactFormDefault = false;
+  bool _hospitalFormDefault = false;
+
   @override
   void initState() {
     super.initState();
@@ -654,7 +688,36 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
     setState(() {
       _contacts = contacts;
       _hospitals = hospitals;
+      _ensureSingleDefaultContact();
+      _ensureSingleDefaultHospital();
     });
+    // Persist so the SOS button reads the same defaults from storage.
+    await _saveContacts();
+    await _saveHospitals();
+  }
+
+  /// Keeps the invariant of exactly one default contact (the SOS target):
+  /// the first flagged one wins; if none is flagged, the first contact is.
+  void _ensureSingleDefaultContact() {
+    if (_contacts.isEmpty) return;
+    var idx = _contacts.indexWhere((c) => c.isDefault);
+    if (idx < 0) idx = 0;
+    for (var i = 0; i < _contacts.length; i++) {
+      if (_contacts[i].isDefault != (i == idx)) {
+        _contacts[i] = _contacts[i].copyWith(isDefault: i == idx);
+      }
+    }
+  }
+
+  void _ensureSingleDefaultHospital() {
+    if (_hospitals.isEmpty) return;
+    var idx = _hospitals.indexWhere((h) => h.isDefault);
+    if (idx < 0) idx = 0;
+    for (var i = 0; i < _hospitals.length; i++) {
+      if (_hospitals[i].isDefault != (i == idx)) {
+        _hospitals[i] = _hospitals[i].copyWith(isDefault: i == idx);
+      }
+    }
   }
 
   List<Map<String, dynamic>> _decodeList(String raw) {
@@ -825,10 +888,13 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       _contactNameCtrl.text = contact.name;
       _contactPhoneCtrl.text = contact.phone;
       _contactRelationCtrl.text = contact.relationship;
+      _contactFormDefault = contact.isDefault;
     } else {
       _contactNameCtrl.clear();
       _contactPhoneCtrl.clear();
       _contactRelationCtrl.clear();
+      // The very first contact automatically becomes the SOS default.
+      _contactFormDefault = _contacts.isEmpty;
     }
     _goTo(_SafetyHubStage.addContact);
   }
@@ -847,14 +913,27 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       name: name,
       phone: phone,
       relationship: relationship.isEmpty ? 'Contact' : relationship,
+      isDefault: _contactFormDefault,
     );
 
     setState(() {
+      int idx;
       if (_editingContactIndex != null) {
-        _contacts[_editingContactIndex!] = contact;
+        idx = _editingContactIndex!;
+        _contacts[idx] = contact;
       } else {
         _contacts.add(contact);
+        idx = _contacts.length - 1;
       }
+      // Only one contact can be the SOS default.
+      if (contact.isDefault) {
+        for (var i = 0; i < _contacts.length; i++) {
+          if (i != idx && _contacts[i].isDefault) {
+            _contacts[i] = _contacts[i].copyWith(isDefault: false);
+          }
+        }
+      }
+      _ensureSingleDefaultContact();
       _stage = _SafetyHubStage.contacts;
     });
     await _saveContacts();
@@ -867,10 +946,21 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
 
   Future<void> _deleteContact(int index) async {
     final contact = _contacts[index];
-    final confirmed = await _confirmDelete('Delete ${contact.name}?');
+    final confirmed = await _confirmDelete(
+      'Delete ${contact.name}?',
+      message: contact.isDefault
+          ? 'This is your DEFAULT emergency contact for the SOS button — '
+                'the SOS emergency SMS is sent to them. Are you sure you '
+                'want to delete them? The next contact in the list will '
+                'become the default.'
+          : null,
+    );
     if (confirmed != true || !mounted) return;
 
-    setState(() => _contacts.removeAt(index));
+    setState(() {
+      _contacts.removeAt(index);
+      _ensureSingleDefaultContact();
+    });
     await _saveContacts();
     if (!mounted) return;
     _showMessage('Contact deleted.');
@@ -889,12 +979,15 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       _hospitalAddressCtrl.text = hospital.address;
       _pickedLat = hospital.latitude;
       _pickedLng = hospital.longitude;
+      _hospitalFormDefault = hospital.isDefault;
     } else {
       _hospitalNameCtrl.clear();
       _hospitalPhoneCtrl.clear();
       _hospitalAddressCtrl.clear();
       _pickedLat = null;
       _pickedLng = null;
+      // The very first hospital automatically becomes the SOS default.
+      _hospitalFormDefault = _hospitals.isEmpty;
     }
     _goTo(_SafetyHubStage.addHospital);
   }
@@ -946,14 +1039,27 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       address: address,
       latitude: _pickedLat,
       longitude: _pickedLng,
+      isDefault: _hospitalFormDefault,
     );
 
     setState(() {
+      int idx;
       if (_editingHospitalIndex != null) {
-        _hospitals[_editingHospitalIndex!] = hospital;
+        idx = _editingHospitalIndex!;
+        _hospitals[idx] = hospital;
       } else {
         _hospitals.add(hospital);
+        idx = _hospitals.length - 1;
       }
+      // Only one hospital can be the SOS default.
+      if (hospital.isDefault) {
+        for (var i = 0; i < _hospitals.length; i++) {
+          if (i != idx && _hospitals[i].isDefault) {
+            _hospitals[i] = _hospitals[i].copyWith(isDefault: false);
+          }
+        }
+      }
+      _ensureSingleDefaultHospital();
       _stage = _SafetyHubStage.hospitals;
     });
     await _saveHospitals();
@@ -966,16 +1072,27 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
 
   Future<void> _deleteHospital(int index) async {
     final hospital = _hospitals[index];
-    final confirmed = await _confirmDelete('Delete ${hospital.name}?');
+    final confirmed = await _confirmDelete(
+      'Delete ${hospital.name}?',
+      message: hospital.isDefault
+          ? 'This is your DEFAULT hospital for the SOS button — the SOS '
+                'emergency SMS is sent to it. Are you sure you want to '
+                'delete it? The next hospital in the list will become the '
+                'default.'
+          : null,
+    );
     if (confirmed != true || !mounted) return;
 
-    setState(() => _hospitals.removeAt(index));
+    setState(() {
+      _hospitals.removeAt(index);
+      _ensureSingleDefaultHospital();
+    });
     await _saveHospitals();
     if (!mounted) return;
     _showMessage('Hospital deleted.');
   }
 
-  Future<bool?> _confirmDelete(String title) {
+  Future<bool?> _confirmDelete(String title, {String? message}) {
     return showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -985,9 +1102,9 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
             title,
             style: const TextStyle(color: Colors.white, fontSize: 16),
           ),
-          content: const Text(
-            'This cannot be undone.',
-            style: TextStyle(color: _muted, fontSize: 13),
+          content: Text(
+            message ?? 'This cannot be undone.',
+            style: const TextStyle(color: _muted, fontSize: 13, height: 1.35),
           ),
           actions: [
             TextButton(
@@ -1338,6 +1455,15 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
               ),
           ],
         ),
+        const SizedBox(height: 16),
+        _DefaultSosSwitch(
+          text: 'Default for SOS button',
+          subtitle:
+              'The SOS emergency SMS is sent to this contact. Only one '
+              'contact can be the default.',
+          value: _contactFormDefault,
+          onChanged: (value) => setState(() => _contactFormDefault = value),
+        ),
         const SizedBox(height: 20),
         _PrimaryButton(
           label: isEditing ? 'Save Changes' : 'Save Contact',
@@ -1478,6 +1604,15 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
               ),
             ),
           ),
+        ),
+        const SizedBox(height: 16),
+        _DefaultSosSwitch(
+          text: 'Default for SOS button',
+          subtitle:
+              'The SOS emergency SMS is sent to this hospital. Only one '
+              'hospital can be the default.',
+          value: _hospitalFormDefault,
+          onChanged: (value) => setState(() => _hospitalFormDefault = value),
         ),
         const SizedBox(height: 20),
         _PrimaryButton(
@@ -1715,6 +1850,90 @@ class _EmergencyNumberCard extends StatelessWidget {
   }
 }
 
+// Switch row used in the add/edit forms to mark the SOS default target.
+class _DefaultSosSwitch extends StatelessWidget {
+  final String text;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _DefaultSosSwitch({
+    required this.text,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: _field,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: value ? _red : _border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.sos, color: _red, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: _muted,
+                    fontSize: 11,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(value: value, activeColor: _red, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}
+
+// Small pill shown on the card of the default SOS contact / hospital.
+class _DefaultBadge extends StatelessWidget {
+  const _DefaultBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: _red.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: _red),
+      ),
+      child: const Text(
+        'DEFAULT · SOS',
+        style: TextStyle(
+          color: _red,
+          fontSize: 8.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+}
+
 class _ContactCard extends StatelessWidget {
   final _EmergencyContact contact;
   final VoidCallback onTap;
@@ -1764,16 +1983,26 @@ class _ContactCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        contact.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              contact.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                          ),
+                          if (contact.isDefault) ...[
+                            const SizedBox(width: 6),
+                            const _DefaultBadge(),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -1881,7 +2110,7 @@ class _HospitalCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Expanded(
+                    Flexible(
                       child: Text(
                         hospital.name,
                         maxLines: 1,
@@ -1894,6 +2123,11 @@ class _HospitalCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (hospital.isDefault) ...[
+                      const SizedBox(width: 6),
+                      const _DefaultBadge(),
+                    ],
+                    const Spacer(),
                     const Text(
                       'Open 24/7',
                       style: TextStyle(
