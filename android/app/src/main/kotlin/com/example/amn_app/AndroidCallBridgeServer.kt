@@ -20,6 +20,10 @@ object AndroidCallBridgeServer {
 
     private val clientPool = Executors.newCachedThreadPool()
 
+    // Hard cap on request body size to prevent a malicious client from
+    // making the server allocate an arbitrarily large buffer (memory DoS).
+    private const val MAX_BODY_BYTES = 64 * 1024
+
     fun start(port: Int, token: String) {
         synchronized(this) {
             if (running && currentPort == port && authToken == token) {
@@ -30,7 +34,14 @@ object AndroidCallBridgeServer {
             authToken = token
             val socket = ServerSocket()
             socket.reuseAddress = true
-            socket.bind(InetSocketAddress("0.0.0.0", port))
+            // Bind to loopback only. This endpoint was previously exposed on
+            // 0.0.0.0 (every network interface) with authentication disabled
+            // whenever the token was blank, so any device on the same Wi-Fi
+            // could POST /answer, /reject, /end etc. and control the phone's
+            // calls with no auth. Loopback keeps it reachable by on-device
+            // clients only; LAN control should be re-enabled deliberately and
+            // only together with a required auth token.
+            socket.bind(InetSocketAddress("127.0.0.1", port))
             serverSocket = socket
             running = true
             serverThread = thread(
@@ -109,7 +120,7 @@ object AndroidCallBridgeServer {
                 val value = line.substring(separator + 1).trim()
                 headers[key] = value
                 if (key == "content-length") {
-                    contentLength = value.toIntOrNull() ?: 0
+                    contentLength = (value.toIntOrNull() ?: 0).coerceIn(0, MAX_BODY_BYTES)
                 }
             }
 
