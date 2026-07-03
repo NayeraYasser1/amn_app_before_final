@@ -196,12 +196,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _driverLicenseUrl = data['driver_license_url'] as String?;
           _carLicenseUrl = data['car_license_url'] as String?;
 
-          _bloodTypeController.text = data['bloodType'] ?? 'O+';
-          _dateOfBirthController.text = data['dateOfBirth'] ?? '05/05/1995';
-          _countryController.text = data['country'] ?? 'Spain';
-          _allergiesController.text = data['allergies'] ?? 'Penicillin';
+          _bloodTypeController.text = data['bloodType'] ?? '';
+          _dateOfBirthController.text = data['dateOfBirth'] ?? '';
+          _countryController.text = data['country'] ?? '';
+          _allergiesController.text = data['allergies'] ?? '';
           _hospitalInsuranceController.text =
-              data['hospitalInsurance'] ?? 'Om El Maresn';
+              data['hospitalInsurance'] ?? '';
 
           _profileImageUrl =
               (data['profilePictureUrl'] as String?) ??
@@ -215,11 +215,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _plateNumberController.text = '';
           _selectedCarModel = _carModels[0];
           _selectedCarColor = _carColors[0];
-          _bloodTypeController.text = 'O+';
-          _dateOfBirthController.text = '05/05/1995';
-          _countryController.text = 'Spain';
-          _allergiesController.text = 'Penicillin';
-          _hospitalInsuranceController.text = 'Om El Maresn';
+          _bloodTypeController.text = '';
+          _dateOfBirthController.text = '';
+          _countryController.text = '';
+          _allergiesController.text = '';
+          _hospitalInsuranceController.text = '';
           _profileImageUrl = user.photoURL;
         }
       }

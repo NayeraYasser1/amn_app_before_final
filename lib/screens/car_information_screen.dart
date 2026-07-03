@@ -44,10 +44,10 @@ class _CarInformationScreenState extends State<CarInformationScreen> {
         if (doc.exists) {
           final data = doc.data()!;
           final car = (data['carInfo'] as Map<String, dynamic>?) ?? {};
-          _carModelController.text = car['model'] ?? 'Renault Auridan';
-          _carNameController.text = car['name'] ?? 'gnid';
-          _carNumberController.text = car['number'] ?? '4512';
-          _carColorController.text = car['color'] ?? 'Black';
+          _carModelController.text = car['model'] ?? '';
+          _carNameController.text = car['name'] ?? '';
+          _carNumberController.text = car['number'] ?? '';
+          _carColorController.text = car['color'] ?? '';
           _carLicenseController.text = car['license'] ?? '';
           _licenseImagePath = car['licenseImagePath'] as String?;
           if (_licenseImagePath != null && _licenseImagePath!.isNotEmpty) {
@@ -69,10 +69,10 @@ class _CarInformationScreenState extends State<CarInformationScreen> {
   }
 
   void _setDefaultValues() {
-    _carModelController.text = 'Renault Auridan';
-    _carNameController.text = 'gnid';
-    _carNumberController.text = '4512';
-    _carColorController.text = 'Black';
+    _carModelController.text = '';
+    _carNameController.text = '';
+    _carNumberController.text = '';
+    _carColorController.text = '';
     _carLicenseController.text = '';
     _licenseImagePath = null;
   }

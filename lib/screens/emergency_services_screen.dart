@@ -153,10 +153,16 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
     });
 
     unawaited(_loadContacts());
-    // Alerts wait for the location attempt so the SMS can carry the live
-    // position; they are sent either way (without the link if GPS fails).
+    // Fire the SOS alerts as soon as the location resolves OR after a hard
+    // deadline — whichever comes first — so a weak or hanging GPS fix can
+    // never block/delay the alert. _sendSosAlerts guards against double
+    // sending and includes the location link only if it is ready by then.
+    final locationAttempt = _resolveLocation();
     unawaited(
-      _resolveLocation().whenComplete(() {
+      Future.any([
+        locationAttempt,
+        Future<void>.delayed(const Duration(seconds: 8)),
+      ]).whenComplete(() {
         if (mounted) unawaited(_sendSosAlerts());
       }),
     );
@@ -210,9 +216,19 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
         throw Exception('permission denied');
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      Position position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        );
+      } on TimeoutException {
+        // A high-accuracy fix can hang indoors; fall back to the last known
+        // position so the SOS still carries a location.
+        final last = await Geolocator.getLastKnownPosition();
+        if (last == null) rethrow;
+        position = last;
+      }
       if (!mounted) return;
       setState(() => _position = position);
 

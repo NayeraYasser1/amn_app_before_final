@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../services/car_driver_status_service.dart';
 
 class DriverStatusScreen extends StatefulWidget {
   const DriverStatusScreen({super.key});
@@ -10,25 +8,9 @@ class DriverStatusScreen extends StatefulWidget {
 }
 
 class _DriverStatusScreenState extends State<DriverStatusScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _recordDriverStatus();
-  }
-
-  Future<void> _recordDriverStatus() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    await CarDriverStatusService.saveDriverStatus(
-      userId: user.uid,
-      driverAttentivenessPercent: 92,
-      distractedMoments: 3,
-      drivingBehaviorScore: 84,
-      fatigueLevelPercent: 35,
-      safetyScore: 72,
-    );
-  }
+  // NOTE: this screen shows placeholder scores. It no longer writes any
+  // fabricated telemetry to Firestore on open — wire it to real driver-
+  // monitoring data before presenting these numbers as live.
 
   @override
   Widget build(BuildContext context) {
