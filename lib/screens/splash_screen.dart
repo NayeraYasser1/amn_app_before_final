@@ -12,6 +12,7 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Offset> _slideAnimation;
+  Timer? _navTimer;
 
   @override
   void initState() {
@@ -32,7 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.forward();
 
     // الانتقال التلقائي بعد 3 ثواني للصفحة الرئيسية
-    Timer(const Duration(seconds: 3), () {
+    _navTimer = Timer(const Duration(seconds: 3), () {
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, 'home');
     });
@@ -40,6 +41,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _navTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

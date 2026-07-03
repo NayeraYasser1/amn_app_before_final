@@ -67,6 +67,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   bool _confirming = false;
   List<_Suggestion> _suggestions = [];
   Timer? _debounce;
+  // Incremented per search so a slow earlier response can't overwrite a newer
+  // query's results (stale-response race).
+  int _searchSeq = 0;
+  // Start time of the last search — used to respect Nominatim's ~1 req/s.
+  DateTime? _lastSearchAt;
 
   @override
   void dispose() {
@@ -97,6 +102,17 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   Future<void> _runSearch() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
+
+    // Throttle: Nominatim's usage policy is ~1 request/second. Ignore calls
+    // that arrive too soon after the last (e.g. rapid submit/button taps).
+    final now = DateTime.now();
+    if (_lastSearchAt != null &&
+        now.difference(_lastSearchAt!) < const Duration(milliseconds: 1100)) {
+      return;
+    }
+    _lastSearchAt = now;
+
+    final seq = ++_searchSeq;
     setState(() {
       _searching = true;
       _suggestions = [];
@@ -120,24 +136,34 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
           )
           .timeout(const Duration(seconds: 8));
       final list = jsonDecode(response.body) as List;
-      final results = list.map((item) {
-        final map = item as Map<String, dynamic>;
-        final display = (map['display_name'] ?? '').toString();
+      // Skip any malformed entry instead of letting one bad coordinate throw
+      // and discard the whole result set.
+      final results = <_Suggestion>[];
+      for (final item in list) {
+        if (item is! Map<String, dynamic>) continue;
+        final lat = double.tryParse((item['lat'] ?? '').toString());
+        final lon = double.tryParse((item['lon'] ?? '').toString());
+        if (lat == null || lon == null) continue;
+        final display = (item['display_name'] ?? '').toString();
         final name = display.isEmpty ? query : display.split(',').first.trim();
-        return _Suggestion(
-          name: name,
-          displayName: display,
-          latitude: double.parse(map['lat'].toString()),
-          longitude: double.parse(map['lon'].toString()),
+        results.add(
+          _Suggestion(
+            name: name,
+            displayName: display,
+            latitude: lat,
+            longitude: lon,
+          ),
         );
-      }).toList();
-      if (!mounted) return;
+      }
+      // Drop this response if a newer search has started since.
+      if (!mounted || seq != _searchSeq) return;
       setState(() => _suggestions = results);
       if (results.isEmpty) _showSnack('No place matched "$query".');
     } catch (_) {
+      if (!mounted || seq != _searchSeq) return;
       _showSnack('Search failed. Check your connection.');
     }
-    if (mounted) setState(() => _searching = false);
+    if (mounted && seq == _searchSeq) setState(() => _searching = false);
   }
 
   // Move the map to a chosen search result.
