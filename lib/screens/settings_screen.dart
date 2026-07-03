@@ -224,7 +224,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         decoration: BoxDecoration(
           color: _navBg,
           border: Border(
-            top: BorderSide(color: _navBorder.withValues(alpha: 0.45), width: 1),
+            top: BorderSide(
+              color: _navBorder.withValues(alpha: 0.45),
+              width: 1,
+            ),
           ),
         ),
         child: SafeArea(
@@ -275,7 +278,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildNavItem(IconData icon, String label, int index) {
     final selected = index == 3;
     // Grey highlight: selected tab is bright grey/white, the rest dimmer grey.
-    final color = selected ? Colors.white : Colors.white.withValues(alpha: 0.45);
+    final color = selected
+        ? Colors.white
+        : Colors.white.withValues(alpha: 0.45);
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -399,7 +404,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           builder: (_) => const AndroidCallBridgeStatusScreen(),
         ),
       );
+    } else {
+      // Unimplemented settings row — give the user feedback instead of a
+      // dead tap. These get wired up as the features land.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"$label" is coming soon.'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
-    // Other labels (Security, Privacy, etc.) can be wired later as needed.
   }
 }

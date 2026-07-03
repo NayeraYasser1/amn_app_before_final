@@ -332,10 +332,7 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           Text(
                             h.hour,
-                            style: const TextStyle(
-                              color: _muted,
-                              fontSize: 11,
-                            ),
+                            style: const TextStyle(color: _muted, fontSize: 11),
                           ),
                           Icon(h.icon, color: h.color, size: 22),
                           Text(
@@ -522,9 +519,9 @@ class _HomePageState extends State<HomePage> {
     UsageLogger.logAction('navigation_trip_canceled');
     await _clearDestination();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Trip canceled.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Trip canceled.')));
   }
 
   void _openEmergencyServices(String actionName) {
@@ -934,84 +931,89 @@ class _SosButtonState extends State<_SosButton>
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(9),
-        boxShadow: [
-          BoxShadow(
-            color: _red.withValues(alpha: 0.25),
-            blurRadius: 22,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: Ink(
-          height: 63,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFF11A21), Color(0xFFD9080E)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    return Semantics(
+      button: true,
+      label:
+          'SOS. Hold three seconds to call an ambulance on 123. Tap for options.',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(9),
+          boxShadow: [
+            BoxShadow(
+              color: _red.withValues(alpha: 0.25),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
             ),
-            borderRadius: BorderRadius.circular(9),
-          ),
-          child: Listener(
-            behavior: HitTestBehavior.opaque,
-            onPointerDown: (event) {
-              _downPosition = event.position;
-              widget.onHoldStart();
-            },
-            onPointerMove: _onPointerMove,
-            onPointerUp: (_) => widget.onHoldCancel(),
-            onPointerCancel: (_) => widget.onHoldCancel(),
-            child: InkWell(
-              onTap: widget.onTap,
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: Ink(
+            height: 63,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF11A21), Color(0xFFD9080E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(9),
-              child: AnimatedBuilder(
-                animation: _progress,
-                builder: (context, _) {
-                  // The label flips to HOLD only after ~150 ms so a quick
-                  // tap doesn't flicker.
-                  final showHold =
-                      widget.isHolding &&
-                      _progress.value > 0.15 / _sosHoldSeconds;
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: FractionallySizedBox(
-                            widthFactor: _progress.value,
-                            heightFactor: 1,
-                            child: ColoredBox(
-                              color: Colors.white.withValues(alpha: 0.28),
-                            ),
-                          ),
-                        ),
-                        Center(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 120),
-                            child: Text(
-                              showHold ? 'HOLD' : 'SOS',
-                              key: ValueKey(showHold),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 31,
-                                fontWeight: FontWeight.w600,
-                                height: 1,
-                                letterSpacing: 0,
+            ),
+            child: Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (event) {
+                _downPosition = event.position;
+                widget.onHoldStart();
+              },
+              onPointerMove: _onPointerMove,
+              onPointerUp: (_) => widget.onHoldCancel(),
+              onPointerCancel: (_) => widget.onHoldCancel(),
+              child: InkWell(
+                onTap: widget.onTap,
+                borderRadius: BorderRadius.circular(9),
+                child: AnimatedBuilder(
+                  animation: _progress,
+                  builder: (context, _) {
+                    // The label flips to HOLD only after ~150 ms so a quick
+                    // tap doesn't flicker.
+                    final showHold =
+                        widget.isHolding &&
+                        _progress.value > 0.15 / _sosHoldSeconds;
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(9),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: FractionallySizedBox(
+                              widthFactor: _progress.value,
+                              heightFactor: 1,
+                              child: ColoredBox(
+                                color: Colors.white.withValues(alpha: 0.28),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                          Center(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 120),
+                              child: Text(
+                                showHold ? 'HOLD' : 'SOS',
+                                key: ValueKey(showHold),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 31,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
