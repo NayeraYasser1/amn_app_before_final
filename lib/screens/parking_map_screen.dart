@@ -155,6 +155,7 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
         );
       },
     );
+    controller.dispose();
     if (result == null || !mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -249,7 +250,7 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
   }
 
   Future<void> _refreshCurrentPosition({bool showErrors = true}) async {
-    if (_isLocating) return;
+    if (_isLocating || !mounted) return;
 
     setState(() => _isLocating = true);
     final position = await _getCurrentPosition(showErrors: showErrors);

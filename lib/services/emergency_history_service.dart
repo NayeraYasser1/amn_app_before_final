@@ -10,12 +10,32 @@ class EmergencyHistoryService {
   EmergencyHistoryService._();
 
   static const String _localStorageKey = 'amn_history_events_json';
+  // Broadcast stream of local history. localEventsStream() already seeds the
+  // current value per listener, so we do NOT refresh in onListen (that caused
+  // a duplicate initial emission and an extra prefs read per subscriber).
   static final StreamController<List<EmergencyEvent>> _controller =
-      StreamController<List<EmergencyEvent>>.broadcast(
-        onListen: () {
-          refresh();
-        },
-      );
+      StreamController<List<EmergencyEvent>>.broadcast();
+
+  // Serializes every read-modify-write so concurrent callers (e.g. an SOS
+  // logEvent racing a user delete) cannot overwrite each other's changes.
+  static Future<void> _writeQueue = Future<void>.value();
+
+  // Monotonic suffix so two events created in the same microsecond get
+  // distinct ids (microsecondsSinceEpoch alone can collide), keeping
+  // delete/restore-by-id correct.
+  static int _idCounter = 0;
+
+  static Future<T> _synchronized<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _writeQueue = _writeQueue.then((_) async {
+      try {
+        completer.complete(await action());
+      } catch (e, s) {
+        completer.completeError(e, s);
+      }
+    });
+    return completer.future;
+  }
 
   static final CollectionReference<Map<String, dynamic>> _collection =
       FirebaseFirestore.instance.collection('emergency_events');
@@ -28,7 +48,7 @@ class EmergencyHistoryService {
     String status = 'Resolved',
   }) async {
     final event = EmergencyEvent(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: '${DateTime.now().microsecondsSinceEpoch}_${_idCounter++}',
       type: type,
       title: title,
       description: description,
@@ -58,41 +78,48 @@ class EmergencyHistoryService {
   }
 
   /// Removes a single local history event by id.
-  static Future<void> deleteEvent(String id) async {
-    final prefs = await SharedPreferences.getInstance();
-    final events = await _loadLocalEvents()
-      ..removeWhere((event) => event.id == id);
-    await prefs.setString(
-      _localStorageKey,
-      jsonEncode(events.map((item) => item.toMap()).toList()),
-    );
-    _controller.add(events);
+  static Future<void> deleteEvent(String id) {
+    return _synchronized(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final events = await _loadLocalEvents()
+        ..removeWhere((event) => event.id == id);
+      await prefs.setString(
+        _localStorageKey,
+        jsonEncode(events.map((item) => item.toMap()).toList()),
+      );
+      _controller.add(events);
+    });
   }
 
   /// Re-inserts a previously deleted event (used for Undo). Events are kept
   /// sorted newest-first so the entry returns to its original position.
-  static Future<void> restoreEvent(EmergencyEvent event) async {
-    final prefs = await SharedPreferences.getInstance();
-    final events = await _loadLocalEvents()..add(event);
-    events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    await prefs.setString(
-      _localStorageKey,
-      jsonEncode(events.map((item) => item.toMap()).toList()),
-    );
-    _controller.add(events);
+  static Future<void> restoreEvent(EmergencyEvent event) {
+    return _synchronized(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final events = await _loadLocalEvents()..add(event);
+      events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      await prefs.setString(
+        _localStorageKey,
+        jsonEncode(events.map((item) => item.toMap()).toList()),
+      );
+      _controller.add(events);
+    });
   }
 
-  static Future<void> _saveLocalEvent(EmergencyEvent event) async {
-    final prefs = await SharedPreferences.getInstance();
-    final events = await _loadLocalEvents();
-    final updated = [event, ...events].take(200).toList();
-    // Stored as a single JSON string (setString), not a string list, because
-    // getStringList proved unreliable on this platform's shared_preferences.
-    await prefs.setString(
-      _localStorageKey,
-      jsonEncode(updated.map((item) => item.toMap()).toList()),
-    );
-    _controller.add(updated);
+  static Future<void> _saveLocalEvent(EmergencyEvent event) {
+    return _synchronized(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final events = [event, ...await _loadLocalEvents()]
+        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      final capped = events.take(200).toList();
+      // Stored as a single JSON string (setString), not a string list,
+      // because getStringList proved unreliable on this platform.
+      await prefs.setString(
+        _localStorageKey,
+        jsonEncode(capped.map((item) => item.toMap()).toList()),
+      );
+      _controller.add(capped);
+    });
   }
 
   static Future<List<EmergencyEvent>> _loadLocalEvents() async {

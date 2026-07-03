@@ -226,9 +226,11 @@ class _MaintenanceRemindersScreenState
       },
     );
 
+    final title = titleController.text.trim();
+    titleController.dispose();
     if (saved != true) return;
     final entry = {
-      'title': titleController.text.trim(),
+      'title': title,
       'due': due.toIso8601String(),
       if (editing && _items[index]['pinned'] == true) 'pinned': true,
     };

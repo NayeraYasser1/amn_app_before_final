@@ -91,12 +91,20 @@ class _CarServiceScreenState extends State<CarServiceScreen> {
       return null;
     }
 
-    return Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+    } catch (_) {
+      // A high-accuracy fix can hang/timeout indoors; fall back to the last
+      // known position so "car repair near me" still works.
+      return Geolocator.getLastKnownPosition();
+    }
   }
 
   Future<void> _refreshLocation() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     final position = await _getCurrentPosition(showErrors: false);
     if (!mounted) return;

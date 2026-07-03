@@ -565,7 +565,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _completeSosHold() async {
-    if (!_isHoldingSos) return;
+    if (!_isHoldingSos || !mounted) return;
 
     _sosHoldTimer?.cancel();
     _suppressNextSosTap = true;
