@@ -173,6 +173,26 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
     _showMessage('Parking location copied — paste it anywhere to share.');
   }
 
+  /// Called from the Arrived stage: the parking session is over, so the
+  /// saved spot (and its note) is cleared — next time Parking opens on the
+  /// save stage instead of offering navigation to an old spot.
+  Future<void> _finishParking() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_parkingLatKey);
+    await prefs.remove(_parkingLngKey);
+    await prefs.remove(_parkingSavedAtKey);
+    await prefs.remove(_parkingNoteKey);
+    await EmergencyHistoryService.logEvent(
+      type: 'parking_found',
+      title: 'Car Found',
+      description: 'Parking completed; saved spot cleared',
+      status: 'Completed',
+    );
+    if (!mounted) return;
+    _showMessage('Car found! Your saved parking spot was cleared.');
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
   // Removes the saved parking note.
   Future<void> _deleteNote() async {
     final prefs = await SharedPreferences.getInstance();
@@ -476,8 +496,7 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
       case _ParkingStage.arrived:
         return _ArrivedStage(
           key: const ValueKey('arrived'),
-          onFound: () =>
-              Navigator.of(context).popUntil((route) => route.isFirst),
+          onFound: _finishParking,
           onShare: _shareLocation,
         );
     }
