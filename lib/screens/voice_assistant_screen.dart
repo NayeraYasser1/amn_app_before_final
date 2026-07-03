@@ -116,11 +116,26 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
           // A user-initiated cancel aborts the engine, which reports an
           // error — keep the "Canceled" message in that case.
           if (_cancelRequested) return;
+          // Distinguish "heard nothing" from a real access problem. When the
+          // recognizer started fine but caught no usable speech it reports
+          // error_no_match / error_speech_timeout — that must NOT be shown as a
+          // permission failure, which wrongly tells the user to grant access.
+          final msg = error.errorMsg;
+          final String reply;
+          if (msg == 'error_no_match' || msg == 'error_speech_timeout') {
+            reply =
+                'I did not catch that. Tap the microphone and try again, speaking clearly.';
+          } else if (msg == 'error_no_permission') {
+            reply =
+                'I could not access the microphone. Please allow microphone and speech recognition permissions in Settings, then try again.';
+          } else {
+            reply =
+                'Something interrupted listening. Please tap the microphone and try again.';
+          }
           setState(() {
             _listening = false;
             _thinking = false;
-            _assistantReply =
-                'I could not access the microphone. Please allow microphone and speech recognition permissions, then try again.';
+            _assistantReply = reply;
           });
         },
       );
@@ -1152,7 +1167,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   /// start failure.
   Future<bool> _beginListenSession() async {
     try {
-      return await _speech.listen(
+      await _speech.listen(
         onResult: (result) {
           if (!mounted) return;
           setState(() {
@@ -1172,8 +1187,18 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
           listenMode: stt.ListenMode.confirmation,
         ),
       );
+      // IMPORTANT: speech_to_text's listen() returns void (a Future<Null>) and
+      // signals failure by THROWING, not by returning false. Do not read its
+      // return value — assigning the null result to a bool threw
+      // "'Null' is not a subtype of bool" on every tap, which surfaced as
+      // "I could not start listening" even though the recognizer had started.
+      // (isListening is set later by an async status callback, so it is not yet
+      // reliable here.) Reaching this line without an exception means the
+      // recognizer started.
+      return true;
     } catch (e) {
-      // A plugin exception must not strand the mic in the listening state.
+      // A real failure (e.g. ListenFailedException) must not strand the mic in
+      // the listening state.
       debugPrint('speech listen() failed to start: $e');
       return false;
     }
