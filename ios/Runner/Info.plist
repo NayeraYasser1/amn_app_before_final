@@ -51,5 +51,9 @@
 	<string>This app uses your location to find nearby hospitals, insurance services, and directions.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>This app uses speech recognition to understand your voice commands.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses the camera to photograph your driver license and profile picture.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app accesses your photo library to select your driver license and profile picture.</string>
 </dict>
 </plist>
