@@ -40,6 +40,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   final _sync = VoiceCommandSyncService.instance;
 
   bool _available = false;
+  bool _ttsAvailable = false;
   bool _initializing = true;
   bool _listening = false;
   bool _thinking = false;
@@ -143,12 +144,23 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
 
   Future<void> _initTts() async {
     try {
+      // Prefer Google TTS when it is installed. Some Samsung devices default to
+      // an engine that repeatedly disconnects (DeadObjectException) and never
+      // actually speaks; Google TTS is far more reliable.
+      try {
+        final engines = await _tts.getEngines;
+        if (engines is List && engines.contains('com.google.android.tts')) {
+          await _tts.setEngine('com.google.android.tts');
+        }
+      } catch (_) {}
       await _tts.setSpeechRate(0.48);
       await _tts.setPitch(1.0);
       await _tts.setVolume(1.0);
+      _ttsAvailable = true;
     } catch (e) {
-      // Some devices have no TTS engine installed; spoken replies are then a
-      // no-op but the assistant must still start and work on-screen.
+      // No usable TTS engine — spoken replies become a no-op, but the assistant
+      // must still start and work on-screen via the tap commands.
+      _ttsAvailable = false;
       debugPrint('TTS init failed: $e');
     }
   }
@@ -1159,8 +1171,11 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
         : _listening
         ? 'Listening...'
         : _available
-        ? 'Tap and speak a command'
-        : 'Microphone unavailable';
+        ? 'Tap and speak, or tap a command below'
+        : 'Voice input is unavailable on this device';
+    // True when the device cannot hear you and/or cannot speak back, so we tell
+    // the user the tap commands still work rather than leaving them stuck.
+    final voiceLimited = !_initializing && (!_available || !_ttsAvailable);
 
     // Curated, tappable examples — tapping one runs it like a spoken command.
     const suggestions = [
@@ -1218,15 +1233,58 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
+              if (voiceLimited) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1705),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Colors.amber,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          !_available
+                              ? "Voice is not working on this tablet, so it can't hear or speak. You can still tap any command below to run it."
+                              : "Spoken replies are off on this tablet, but your voice commands and the buttons below still work.",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 30),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Keeps the microphone centred when the cancel button shows.
                   const SizedBox(width: 76),
-                  GestureDetector(
-                    onTap: _toggleListening,
-                    child: AnimatedContainer(
+                  Semantics(
+                    button: true,
+                    label: _listening
+                        ? 'Stop listening'
+                        : 'Start a voice command',
+                    child: GestureDetector(
+                      onTap: _toggleListening,
+                      child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       width: _listening ? 124 : 112,
                       height: _listening ? 124 : 112,
@@ -1249,10 +1307,11 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
                           ),
                         ],
                       ),
-                      child: Icon(
-                        _listening ? Icons.mic : Icons.mic_none,
-                        color: Colors.white,
-                        size: 48,
+                        child: Icon(
+                          _listening ? Icons.mic : Icons.mic_none,
+                          color: Colors.white,
+                          size: 48,
+                        ),
                       ),
                     ),
                   ),
