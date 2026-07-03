@@ -155,7 +155,10 @@ class EngineStatusScreen extends StatelessWidget {
               return ListView(
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
                 children: [
-                  _TopBar(onBack: () => Navigator.pop(context)),
+                  _TopBar(
+                    onBack: () => Navigator.pop(context),
+                    isLive: engine.updatedAt != null,
+                  ),
                   const SizedBox(height: 20),
                   _MainStatusCard(engine: engine),
                   const SizedBox(height: 16),
@@ -220,8 +223,9 @@ class EngineStatusScreen extends StatelessWidget {
 
 class _TopBar extends StatelessWidget {
   final VoidCallback onBack;
+  final bool isLive;
 
-  const _TopBar({required this.onBack});
+  const _TopBar({required this.onBack, required this.isLive});
 
   @override
   Widget build(BuildContext context) {
@@ -248,14 +252,16 @@ class _TopBar extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: _red.withValues(alpha: 0.12),
+                color: (isLive ? _red : _muted).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _red.withValues(alpha: 0.45)),
+                border: Border.all(
+                  color: (isLive ? _red : _muted).withValues(alpha: 0.45),
+                ),
               ),
-              child: const Text(
-                'LIVE',
+              child: Text(
+                isLive ? 'LIVE' : 'DEMO',
                 style: TextStyle(
-                  color: _red,
+                  color: isLive ? _red : _muted,
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0,

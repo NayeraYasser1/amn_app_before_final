@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:amn_app/services/auth_service.dart';
+import 'package:amn_app/utils/car_options.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -46,42 +47,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   static final RegExp _plateAllowedPattern = RegExp(r'^[A-Z0-9-]+$');
   static final RegExp _e164Pattern = RegExp(r'^\+[1-9]\d{7,14}$');
 
-  static const List<String> _carModels = [
-    'Select Car Model',
-    'Toyota',
-    'Honda',
-    'BMW',
-    'Mercedes-Benz',
-    'Ford',
-    'Chevrolet',
-    'Volkswagen',
-    'Audi',
-    'Mazda',
-    'Nissan',
-    'Hyundai',
-    'Kia',
-    'Renault',
-    'Peugeot',
-    'Other',
-  ];
-
-  static const List<String> _carColors = [
-    'Select Car Color',
-    'Black',
-    'White',
-    'Silver',
-    'Gray',
-    'Red',
-    'Blue',
-    'Green',
-    'Yellow',
-    'Orange',
-    'Brown',
-    'Gold',
-    'Purple',
-    'Pink',
-    'Other',
-  ];
+  static const List<String> _carModels = kCarModels;
+  static const List<String> _carColors = kCarColors;
 
   // Dropdown options
   final List<String> _bloodTypes = [

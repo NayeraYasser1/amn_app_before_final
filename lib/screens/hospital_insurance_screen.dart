@@ -683,6 +683,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _statusController = TextEditingController();
+  String? _error;
 
   @override
   void dispose() {
@@ -726,6 +727,13 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
                   ? 'Status (e.g. Open 24/7)'
                   : 'Details (e.g. Policy / Claims)',
             ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: const TextStyle(color: Color(0xFFE81218), fontSize: 12),
+              ),
+            ],
           ],
         ),
       ),
@@ -739,6 +747,9 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           onPressed: () {
             if (_nameController.text.trim().isEmpty ||
                 _phoneController.text.trim().isEmpty) {
+              setState(
+                () => _error = 'Please enter both a name and a phone number.',
+              );
               return;
             }
 

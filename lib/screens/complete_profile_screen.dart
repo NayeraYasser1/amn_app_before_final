@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:amn_app/services/user_service.dart';
 import 'package:amn_app/models/user_profile.dart';
 import 'package:amn_app/widgets/my_buttons.dart';
+import 'package:amn_app/utils/car_options.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
   final String email;
@@ -36,43 +37,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final UserService _userService = UserService();
 
   // Car model options
-  static const List<String> carModels = [
-    'Select Car Model',
-    'Toyota',
-    'Honda',
-    'BMW',
-    'Mercedes-Benz',
-    'Ford',
-    'Chevrolet',
-    'Volkswagen',
-    'Audi',
-    'Mazda',
-    'Nissan',
-    'Hyundai',
-    'Kia',
-    'Renault',
-    'Peugeot',
-    'Other',
-  ];
-
-  // Car color options
-  static const List<String> carColors = [
-    'Select Car Color',
-    'Black',
-    'White',
-    'Silver',
-    'Gray',
-    'Red',
-    'Blue',
-    'Green',
-    'Yellow',
-    'Orange',
-    'Brown',
-    'Gold',
-    'Purple',
-    'Pink',
-    'Other',
-  ];
+  static const List<String> carModels = kCarModels;
+  static const List<String> carColors = kCarColors;
 
   @override
   void initState() {

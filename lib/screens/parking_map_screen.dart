@@ -1280,7 +1280,7 @@ class _BottomNavItem extends StatelessWidget {
 
 // A real OpenStreetMap (free, keyless) showing the user's location and/or the
 // saved car pin. Fits both on screen when both are known.
-class _ParkingMap extends StatelessWidget {
+class _ParkingMap extends StatefulWidget {
   final Position? currentPosition;
   final _SavedParkingLocation? savedLocation;
   final double height;
@@ -1296,19 +1296,65 @@ class _ParkingMap extends StatelessWidget {
   });
 
   @override
+  State<_ParkingMap> createState() => _ParkingMapState();
+}
+
+class _ParkingMapState extends State<_ParkingMap> {
+  final MapController _mapController = MapController();
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ParkingMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // While no car is saved (the save stage), follow the live GPS position so
+    // "Use Current GPS" actually recenters the already-built map.
+    if (widget.savedLocation == null && widget.currentPosition != null) {
+      final prev = oldWidget.currentPosition;
+      final now = widget.currentPosition!;
+      if (prev == null ||
+          prev.latitude != now.latitude ||
+          prev.longitude != now.longitude) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          try {
+            _mapController.move(
+              LatLng(now.latitude, now.longitude),
+              _mapController.camera.zoom,
+            );
+          } catch (_) {}
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final carPoint = savedLocation == null
+    final carPoint = widget.savedLocation == null
         ? null
-        : LatLng(savedLocation!.latitude, savedLocation!.longitude);
-    final userPoint = currentPosition == null
+        : LatLng(
+            widget.savedLocation!.latitude,
+            widget.savedLocation!.longitude,
+          );
+    final userPoint = widget.currentPosition == null
         ? null
-        : LatLng(currentPosition!.latitude, currentPosition!.longitude);
+        : LatLng(
+            widget.currentPosition!.latitude,
+            widget.currentPosition!.longitude,
+          );
     final center = carPoint ?? userPoint;
 
     if (center == null) {
       return SizedBox(
-        height: height,
-        child: _MapUnavailable(isLocating: isLocating, onRetry: onRetry),
+        height: widget.height,
+        child: _MapUnavailable(
+          isLocating: widget.isLocating,
+          onRetry: widget.onRetry,
+        ),
       );
     }
 
@@ -1334,9 +1380,10 @@ class _ParkingMap extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
-        height: height,
+        height: widget.height,
         width: double.infinity,
         child: FlutterMap(
+          mapController: _mapController,
           options: MapOptions(
             initialCenter: center,
             initialZoom: 16,
