@@ -175,7 +175,7 @@ class _ControlsTabState extends State<_ControlsTab> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.purple.withOpacity(0.3),
+                      color: Colors.purple.withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 6),
                     ),
@@ -566,25 +566,25 @@ class _ChargingInfoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
+    // The parent Row already wraps each tile in an Expanded; returning another
+    // Expanded here nests Expanded-in-Expanded (invalid). Return the Column.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

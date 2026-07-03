@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/emergency_history_service.dart';
 import '../services/sos_alert_service.dart';
+import '../utils/phone.dart';
 import '../services/usage_logger.dart';
 import 'emergency_history_screen.dart';
 import 'safety_hub_screen.dart';
@@ -339,7 +340,9 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
     if (phone == null || phone.isEmpty) return;
     try {
       await launchUrl(
-        Uri.parse('sms:$phone?body=${Uri.encodeComponent(_alertMessage)}'),
+        Uri.parse(
+          'sms:${sanitizePhoneNumber(phone)}?body=${Uri.encodeComponent(_alertMessage)}',
+        ),
         mode: LaunchMode.externalApplication,
       );
     } catch (_) {}
@@ -409,7 +412,7 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
   }
 
   Future<void> _dialNumber(String number) async {
-    final uri = Uri(scheme: 'tel', path: number);
+    final uri = Uri(scheme: 'tel', path: sanitizePhoneNumber(number));
     try {
       final launched = await launchUrl(
         uri,

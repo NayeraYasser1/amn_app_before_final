@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/emergency_history_service.dart';
 import '../services/usage_logger.dart';
+import '../utils/phone.dart';
 import 'emergency_history_screen.dart';
 import 'map_picker_screen.dart';
 import 'settings_screen.dart';
@@ -833,7 +834,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
 
     try {
       final launched = await launchUrl(
-        Uri(scheme: 'tel', path: number),
+        Uri(scheme: 'tel', path: sanitizePhoneNumber(number)),
         mode: LaunchMode.externalApplication,
       );
       if (!launched && mounted) {
