@@ -87,20 +87,24 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
 
     final note = prefs.getString(_parkingNoteKey);
 
-    if (!mounted || lat == null || lng == null) return;
+    if (!mounted) return;
 
-    setState(() {
-      _savedLocation = _SavedParkingLocation(
-        latitude: lat,
-        longitude: lng,
-        savedAt: savedAt ?? DateTime.now(),
-      );
-      _note = (note != null && note.isNotEmpty) ? note : null;
-      // A spot is already saved — open on Find My Car so returning users
-      // see their pinned parking instead of being asked to save again.
-      if (!widget.startOnSave) _stage = _ParkingStage.find;
-    });
+    if (lat != null && lng != null) {
+      setState(() {
+        _savedLocation = _SavedParkingLocation(
+          latitude: lat,
+          longitude: lng,
+          savedAt: savedAt ?? DateTime.now(),
+        );
+        _note = (note != null && note.isNotEmpty) ? note : null;
+        // A spot is already saved — open on Find My Car so returning users
+        // see their pinned parking instead of being asked to save again.
+        if (!widget.startOnSave) _stage = _ParkingStage.find;
+      });
+    }
 
+    // Always fetch the live position, also when nothing is saved yet —
+    // otherwise the save stage sits on "Enable location" with GPS on.
     await _refreshCurrentPosition(showErrors: false);
   }
 
@@ -585,6 +589,8 @@ class _SaveParkingStage extends StatelessWidget {
             currentPosition: currentPosition,
             savedLocation: savedLocation,
             height: 246,
+            isLocating: isLocating,
+            onRetry: onRefreshLocation,
           ),
           const SizedBox(height: 14),
           _DarkCard(
@@ -631,7 +637,9 @@ class _SaveParkingStage extends StatelessWidget {
                     ),
                     const Spacer(),
                     Text(
-                      _distanceText(distanceMeters),
+                      savedLocation == null
+                          ? 'No parking saved yet'
+                          : _distanceText(distanceMeters),
                       style: const TextStyle(color: _green, fontSize: 12),
                     ),
                     const SizedBox(width: 7),
@@ -1272,11 +1280,15 @@ class _ParkingMap extends StatelessWidget {
   final Position? currentPosition;
   final _SavedParkingLocation? savedLocation;
   final double height;
+  final bool isLocating;
+  final VoidCallback? onRetry;
 
   const _ParkingMap({
     required this.currentPosition,
     required this.savedLocation,
     required this.height,
+    this.isLocating = false,
+    this.onRetry,
   });
 
   @override
@@ -1290,7 +1302,10 @@ class _ParkingMap extends StatelessWidget {
     final center = carPoint ?? userPoint;
 
     if (center == null) {
-      return SizedBox(height: height, child: const _MapUnavailable());
+      return SizedBox(
+        height: height,
+        child: _MapUnavailable(isLocating: isLocating, onRetry: onRetry),
+      );
     }
 
     CameraFit? fit;
@@ -1367,7 +1382,10 @@ class _ParkingMap extends StatelessWidget {
 }
 
 class _MapUnavailable extends StatelessWidget {
-  const _MapUnavailable();
+  final bool isLocating;
+  final VoidCallback? onRetry;
+
+  const _MapUnavailable({this.isLocating = false, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -1378,17 +1396,51 @@ class _MapUnavailable extends StatelessWidget {
         border: Border.all(color: _border),
       ),
       alignment: Alignment.center,
-      child: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.location_off_outlined, color: _muted, size: 40),
-          SizedBox(height: 10),
-          Text(
-            'Enable location to show the map.',
-            style: TextStyle(color: _muted, fontSize: 13),
-          ),
-        ],
-      ),
+      child: isLocating
+          ? const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: _muted,
+                  ),
+                ),
+                SizedBox(height: 14),
+                Text(
+                  'Finding your location…',
+                  style: TextStyle(color: _muted, fontSize: 13),
+                ),
+              ],
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.location_off_outlined,
+                  color: _muted,
+                  size: 40,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Location unavailable — check that GPS is on.',
+                  style: TextStyle(color: _muted, fontSize: 13),
+                ),
+                if (onRetry != null) ...[
+                  const SizedBox(height: 6),
+                  TextButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh, color: _blue, size: 17),
+                    label: const Text(
+                      'Try again',
+                      style: TextStyle(color: _blue, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ],
+            ),
     );
   }
 }
