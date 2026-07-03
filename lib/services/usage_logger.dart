@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 class UsageLogger {
   UsageLogger._();
@@ -14,15 +15,20 @@ class UsageLogger {
     required String name,
     Map<String, dynamic>? data,
   }) async {
-    final user = FirebaseAuth.instance.currentUser;
-
-    await _collection.add({
-      'userId': user?.uid,
-      'type': type,
-      'name': name,
-      'data': data ?? {},
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    // Analytics logging must never break app flow — e.g. if Firestore rules
+    // deny the usage_events collection, or the network is down.
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      await _collection.add({
+        'userId': user?.uid,
+        'type': type,
+        'name': name,
+        'data': data ?? {},
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('UsageLogger.logEvent failed: $e');
+    }
   }
 
   static Future<void> logScreenView(String screenName) async {

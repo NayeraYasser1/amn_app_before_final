@@ -1,19 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
-  AuthService({
-    FirebaseAuth? auth,
-    GoogleSignIn? googleSignIn,
-    FlutterSecureStorage? storage,
-  }) : _auth = auth ?? FirebaseAuth.instance,
-       _googleSignIn = googleSignIn ?? GoogleSignIn(),
-       _storage = storage ?? const FlutterSecureStorage();
+  AuthService({FirebaseAuth? auth, FlutterSecureStorage? storage})
+    : _auth = auth ?? FirebaseAuth.instance,
+      _storage = storage ?? const FlutterSecureStorage();
 
   final FirebaseAuth _auth;
-  final GoogleSignIn _googleSignIn;
   final FlutterSecureStorage _storage;
 
   Future<String?> signIn(String email, String password) async {
@@ -48,43 +42,7 @@ class AuthService {
     }
   }
 
-  Future<String?> signInWithGoogle() async {
-    try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        return 'Google sign-in was cancelled.';
-      }
-
-      final googleAuth = await googleUser.authentication;
-      final accessToken = googleAuth.accessToken;
-      final idToken = googleAuth.idToken;
-      if (accessToken == null || idToken == null) {
-        return 'Google sign-in failed. Please try again.';
-      }
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: accessToken,
-        idToken: idToken,
-      );
-
-      await _auth.signInWithCredential(credential);
-      return null;
-    } on FirebaseAuthException catch (e) {
-      debugPrint('AuthService.signInWithGoogle failed: ${e.code} ${e.message}');
-      return 'Unable to sign in with Google. Please try again later.';
-    } catch (e) {
-      debugPrint('AuthService.signInWithGoogle unexpected error: $e');
-      return 'Unable to sign in with Google. Please try again later.';
-    }
-  }
-
   Future<void> signOut() async {
-    try {
-      await _googleSignIn.signOut();
-    } catch (e) {
-      debugPrint('AuthService.signOut GoogleSignIn signOut failed: $e');
-    }
-
     try {
       await _auth.signOut();
     } catch (e) {

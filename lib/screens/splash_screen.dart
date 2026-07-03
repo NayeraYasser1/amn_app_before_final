@@ -60,7 +60,15 @@ class _SplashScreenState extends State<SplashScreen>
                   position: _slideAnimation,
                   child: SizedBox(
                     height: 180,
-                    child: Image.asset("images/logo3.png"),
+                    child: Image.asset(
+                      "images/logo3.png",
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(
+                            Icons.shield_outlined,
+                            size: 120,
+                            color: Colors.white,
+                          ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),

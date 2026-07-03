@@ -36,6 +36,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   firebase_core: ^4.2.1
   firebase_auth: ^6.1.2
+  # NOTE: unused by Dart code (the dead Google sign-in path was removed), but
+  # kept for now because dropping it makes Gradle resolve a newer
+  # play-services-auth that this build machine cannot download. Remove once a
+  # network that can reach dl.google.com is available.
   google_sign_in: ^6.1.5
   flutter_secure_storage: ^9.0.0
   cloud_firestore: ^6.1.0

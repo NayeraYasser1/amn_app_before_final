@@ -74,6 +74,24 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      // App-wide dark theme so system-drawn surfaces (dialogs, date pickers,
+      // default buttons, text selection) match the app instead of falling back
+      // to the light Material default (which rendered accent text purple).
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF020607),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFE81218),
+          brightness: Brightness.dark,
+        ),
+        snackBarTheme: const SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+        ),
+        progressIndicatorTheme: const ProgressIndicatorThemeData(
+          color: Color(0xFFE81218),
+        ),
+      ),
       locale: _locale,
       supportedLocales: const [
         Locale('en'),

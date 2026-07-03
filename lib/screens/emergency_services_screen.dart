@@ -302,6 +302,12 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
           () => _contactAlertState = ok ? _AlertState.sent : _AlertState.failed,
         );
       }
+      if (!ok && mounted) {
+        // The silent send failed (permission denied / no SIM / airplane mode).
+        // Open the Messages composer prefilled so the primary contact is still
+        // alerted instead of the failure being silent.
+        await _openSmsComposer(contact['phone']);
+      }
       unawaited(
         EmergencyHistoryService.logEvent(
           type: 'sos',
