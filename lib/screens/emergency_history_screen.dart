@@ -105,53 +105,71 @@ class _EmergencyHistoryScreenState extends State<EmergencyHistoryScreen> {
         final events = snapshot.data ?? const <EmergencyEvent>[];
         final filtered = _filteredEvents(events);
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          children: [
-            _HistoryTopBar(
-              title: 'History',
-              showBack: true,
-              onBack: () => Navigator.pop(context),
-              onRefresh: EmergencyHistoryService.refresh,
-            ),
-            const SizedBox(height: 18),
-            _FilterChips(
-              selected: _filter,
-              events: events,
-              onSelected: (filter) {
-                UsageLogger.logAction('history_${filter.name}');
-                setState(() => _filter = filter);
-              },
-            ),
-            const SizedBox(height: 18),
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                events.isEmpty)
-              const Padding(
+        final loading =
+            snapshot.connectionState == ConnectionState.waiting &&
+            events.isEmpty;
+        final empty = !loading && filtered.isEmpty;
+        // Events are rendered lazily so a full 200-item history doesn't build
+        // every card up front. Index 0 is the header; the body is either a
+        // single loading/empty placeholder or one item per event.
+        final bodyCount = (loading || empty) ? 1 : filtered.length;
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+          itemCount: 1 + bodyCount,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _HistoryTopBar(
+                    title: 'History',
+                    showBack: true,
+                    onBack: () => Navigator.pop(context),
+                    onRefresh: EmergencyHistoryService.refresh,
+                  ),
+                  const SizedBox(height: 18),
+                  _FilterChips(
+                    selected: _filter,
+                    events: events,
+                    onSelected: (filter) {
+                      UsageLogger.logAction('history_${filter.name}');
+                      setState(() => _filter = filter);
+                    },
+                  ),
+                  const SizedBox(height: 18),
+                ],
+              );
+            }
+
+            if (loading) {
+              return const Padding(
                 padding: EdgeInsets.only(top: 80),
                 child: Center(child: CircularProgressIndicator(color: _red)),
-              )
-            else if (filtered.isEmpty)
-              _EmptyHistory(filter: _filter)
-            else
-              for (var i = 0; i < filtered.length; i++) ...[
-                _HistoryEventCard(
-                  event: filtered[i],
-                  onTap: () {
-                    UsageLogger.logAction(
-                      'history_detail_open',
-                      data: {
-                        'type': filtered[i].type,
-                        'title': filtered[i].title,
-                      },
-                    );
-                    setState(() => _selectedEvent = filtered[i]);
-                  },
-                  onDelete: () => _deleteEvent(filtered[i]),
-                ),
-                if (i != filtered.length - 1) const SizedBox(height: 10),
-              ],
-            const SizedBox(height: 80),
-          ],
+              );
+            }
+            if (empty) {
+              return _EmptyHistory(filter: _filter);
+            }
+
+            final event = filtered[index - 1];
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: index - 1 == filtered.length - 1 ? 0 : 10,
+              ),
+              child: _HistoryEventCard(
+                event: event,
+                onTap: () {
+                  UsageLogger.logAction(
+                    'history_detail_open',
+                    data: {'type': event.type, 'title': event.title},
+                  );
+                  setState(() => _selectedEvent = event);
+                },
+                onDelete: () => _deleteEvent(event),
+              ),
+            );
+          },
         );
       },
     );

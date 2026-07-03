@@ -665,6 +665,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   child: Image.network(
                                     _profileImageUrl!,
                                     fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stack) =>
+                                        Icon(
+                                          Icons.person,
+                                          size: 60,
+                                          color: Colors.grey[400],
+                                        ),
                                   ),
                                 )
                               : Icon(

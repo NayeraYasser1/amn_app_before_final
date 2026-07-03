@@ -143,6 +143,7 @@ class _HomePageState extends State<HomePage> {
       }
       return await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 8),
       );
     } catch (_) {
       return null;
@@ -177,7 +178,7 @@ class _HomePageState extends State<HomePage> {
         'timezone': 'auto',
         'forecast_days': '1',
       });
-      final response = await http.get(uri);
+      final response = await http.get(uri).timeout(const Duration(seconds: 8));
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       final current = data['current'] as Map<String, dynamic>;
@@ -434,7 +435,7 @@ class _HomePageState extends State<HomePage> {
         '${position.longitude},${position.latitude};$destLng,$destLat'
         '?overview=false',
       );
-      final response = await http.get(uri);
+      final response = await http.get(uri).timeout(const Duration(seconds: 8));
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final routes = data['routes'] as List?;
       if (response.statusCode == 200 && routes != null && routes.isNotEmpty) {

@@ -344,12 +344,6 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
             'color': widget.args.selectedCarColor,
           },
           'profilePictureUrl': profilePictureUrl, // For compatibility
-          // ignore: equal_keys_in_map
-          'carDetails': {
-            'model': widget.args.selectedCarModel,
-            'plateNumber': widget.args.plateNumber,
-            'color': widget.args.selectedCarColor,
-          },
           'driver_license_url': driverUrl,
           'car_license_url': carUrl,
           'createdAt': FieldValue.serverTimestamp(),

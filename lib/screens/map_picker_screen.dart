@@ -113,10 +113,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         'bounded': '0',
       };
       final uri = Uri.https('nominatim.openstreetmap.org', '/search', params);
-      final response = await http.get(
-        uri,
-        headers: {'User-Agent': 'amn_app/1.0 (safety assistance app)'},
-      );
+      final response = await http
+          .get(
+            uri,
+            headers: {'User-Agent': 'amn_app/1.0 (safety assistance app)'},
+          )
+          .timeout(const Duration(seconds: 8));
       final list = jsonDecode(response.body) as List;
       final results = list.map((item) {
         final map = item as Map<String, dynamic>;
@@ -160,10 +162,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         'format': 'json',
         'zoom': '18',
       });
-      final response = await http.get(
-        uri,
-        headers: {'User-Agent': 'amn_app/1.0 (safety assistance app)'},
-      );
+      final response = await http
+          .get(
+            uri,
+            headers: {'User-Agent': 'amn_app/1.0 (safety assistance app)'},
+          )
+          .timeout(const Duration(seconds: 8));
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final name = data['display_name']?.toString();
       if (name == null || name.isEmpty) return 'Pinned location';
