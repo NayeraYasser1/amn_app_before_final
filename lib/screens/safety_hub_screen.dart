@@ -1129,7 +1129,8 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 16),
           ),
           content: Text(
-            message ?? 'This cannot be undone.',
+            message ?? 'It will be removed from your list. '
+                'You can add it again anytime.',
             style: const TextStyle(color: _muted, fontSize: 13, height: 1.35),
           ),
           actions: [
@@ -2159,24 +2160,30 @@ class _HospitalCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Flexible(
-                      child: Text(
-                        hospital.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0,
-                        ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              hospital.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                          ),
+                          if (hospital.isDefault) ...[
+                            const SizedBox(width: 6),
+                            const _DefaultBadge(),
+                          ],
+                        ],
                       ),
                     ),
-                    if (hospital.isDefault) ...[
-                      const SizedBox(width: 6),
-                      const _DefaultBadge(),
-                    ],
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     const Text(
                       'Open 24/7',
                       style: TextStyle(

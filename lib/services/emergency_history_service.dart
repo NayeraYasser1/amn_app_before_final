@@ -57,6 +57,31 @@ class EmergencyHistoryService {
     _controller.add(await _loadLocalEvents());
   }
 
+  /// Removes a single local history event by id.
+  static Future<void> deleteEvent(String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    final events = await _loadLocalEvents()
+      ..removeWhere((event) => event.id == id);
+    await prefs.setString(
+      _localStorageKey,
+      jsonEncode(events.map((item) => item.toMap()).toList()),
+    );
+    _controller.add(events);
+  }
+
+  /// Re-inserts a previously deleted event (used for Undo). Events are kept
+  /// sorted newest-first so the entry returns to its original position.
+  static Future<void> restoreEvent(EmergencyEvent event) async {
+    final prefs = await SharedPreferences.getInstance();
+    final events = await _loadLocalEvents()..add(event);
+    events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    await prefs.setString(
+      _localStorageKey,
+      jsonEncode(events.map((item) => item.toMap()).toList()),
+    );
+    _controller.add(events);
+  }
+
   static Future<void> _saveLocalEvent(EmergencyEvent event) async {
     final prefs = await SharedPreferences.getInstance();
     final events = await _loadLocalEvents();

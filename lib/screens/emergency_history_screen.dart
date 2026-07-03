@@ -146,6 +146,7 @@ class _EmergencyHistoryScreenState extends State<EmergencyHistoryScreen> {
                     );
                     setState(() => _selectedEvent = filtered[i]);
                   },
+                  onDelete: () => _deleteEvent(filtered[i]),
                 ),
                 if (i != filtered.length - 1) const SizedBox(height: 10),
               ],
@@ -153,6 +154,21 @@ class _EmergencyHistoryScreenState extends State<EmergencyHistoryScreen> {
           ],
         );
       },
+    );
+  }
+
+  Future<void> _deleteEvent(EmergencyEvent event) async {
+    await EmergencyHistoryService.deleteEvent(event.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Deleted "${event.title}"'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => EmergencyHistoryService.restoreEvent(event),
+        ),
+      ),
     );
   }
 
@@ -377,8 +393,13 @@ class _FilterChipButton extends StatelessWidget {
 class _HistoryEventCard extends StatelessWidget {
   final EmergencyEvent event;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
-  const _HistoryEventCard({required this.event, required this.onTap});
+  const _HistoryEventCard({
+    required this.event,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -445,6 +466,18 @@ class _HistoryEventCard extends StatelessWidget {
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                   ),
+                ),
+                const SizedBox(width: 2),
+                IconButton(
+                  onPressed: onDelete,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 34,
+                    minHeight: 34,
+                  ),
+                  icon: const Icon(Icons.close, color: _muted, size: 18),
+                  tooltip: 'Delete',
                 ),
               ],
             ),
