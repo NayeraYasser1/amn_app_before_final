@@ -1118,7 +1118,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     );
                   },
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     color: Colors.grey[800],
                     alignment: Alignment.center,
                     child: const Icon(

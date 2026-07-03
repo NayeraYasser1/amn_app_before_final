@@ -372,6 +372,7 @@ class _ChargingTabState extends State<_ChargingTab> {
                       'need_assistance_tap',
                       data: {'station': '#4'},
                     );
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Assistance requested')),
                     );

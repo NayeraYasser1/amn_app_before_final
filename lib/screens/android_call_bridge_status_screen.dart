@@ -68,6 +68,7 @@ class _AndroidCallBridgeStatusScreenState
     if (!mounted) return;
     setState(() => _busy = false);
     await _refreshStatus(showLoader: false);
+    if (!mounted) return;
     final ok = result['ok'] == true;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -184,7 +185,7 @@ class _AndroidCallBridgeStatusScreenState
                               label: 'Ignore Battery Optimization',
                               onTap: () async {
                                 await _bridge.requestBatteryOptimizationExemption();
-                                if (!mounted) return;
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text(
