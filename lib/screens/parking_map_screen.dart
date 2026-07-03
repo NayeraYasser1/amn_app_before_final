@@ -444,6 +444,7 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
           onBack: () => _setStage(_ParkingStage.save),
           onViewMap: _openSavedPinInGoogleMaps,
           onNavigate: _openNavigationToCar,
+          onAddNote: _addNote,
           onDeleteNote: _deleteNote,
           onDone: () =>
               Navigator.of(context).popUntil((route) => route.isFirst),
@@ -459,6 +460,7 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
           onNavigate: _openNavigationToCar,
           onViewMap: _openSavedPinInGoogleMaps,
           onSaveNew: () => _setStage(_ParkingStage.save),
+          onAddNote: _addNote,
           onDeleteNote: _deleteNote,
         );
       case _ParkingStage.navigate:
@@ -667,6 +669,7 @@ class _ParkingSavedStage extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onViewMap;
   final VoidCallback onNavigate;
+  final VoidCallback onAddNote;
   final VoidCallback onDone;
 
   const _ParkingSavedStage({
@@ -679,6 +682,7 @@ class _ParkingSavedStage extends StatelessWidget {
     required this.onBack,
     required this.onViewMap,
     required this.onNavigate,
+    required this.onAddNote,
     required this.onDone,
   });
 
@@ -750,6 +754,11 @@ class _ParkingSavedStage extends StatelessWidget {
           const SizedBox(height: 12),
           _PrimaryButton(text: 'Navigate to Car', onPressed: onNavigate),
           const SizedBox(height: 12),
+          _SecondaryButton(
+            text: note == null ? 'Add Note (Optional)' : 'Edit Note',
+            onPressed: onAddNote,
+          ),
+          const SizedBox(height: 12),
           _SecondaryButton(text: 'Done', onPressed: onDone),
         ],
       ),
@@ -767,6 +776,7 @@ class _FindMyCarStage extends StatelessWidget {
   final VoidCallback onNavigate;
   final VoidCallback onViewMap;
   final VoidCallback onSaveNew;
+  final VoidCallback onAddNote;
 
   const _FindMyCarStage({
     super.key,
@@ -779,6 +789,7 @@ class _FindMyCarStage extends StatelessWidget {
     required this.onNavigate,
     required this.onViewMap,
     required this.onSaveNew,
+    required this.onAddNote,
   });
 
   @override
@@ -838,6 +849,11 @@ class _FindMyCarStage extends StatelessWidget {
           _SecondaryButton(
             text: 'Open Pin in Google Maps',
             onPressed: onViewMap,
+          ),
+          const SizedBox(height: 12),
+          _SecondaryButton(
+            text: note == null ? 'Add Note (Optional)' : 'Edit Note',
+            onPressed: onAddNote,
           ),
           const SizedBox(height: 12),
           _SecondaryButton(
