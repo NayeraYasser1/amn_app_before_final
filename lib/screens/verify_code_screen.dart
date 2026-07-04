@@ -6,12 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:amn_app/services/cloudinary_service.dart';
 import 'dart:io';
-import 'reset_password_screen.dart';
-
-enum VerifyFlow { signup, forgotPassword }
 
 class VerifyCodeArgs {
-  final VerifyFlow flow;
   final String phone;
   final String verificationId;
   final int? resendToken;
@@ -29,7 +25,6 @@ class VerifyCodeArgs {
   final String? selectedCarColor;
 
   const VerifyCodeArgs._({
-    required this.flow,
     required this.phone,
     required this.verificationId,
     required this.resendToken,
@@ -60,7 +55,6 @@ class VerifyCodeArgs {
     String? plateNumber,
     String? selectedCarColor,
   }) : this._(
-         flow: VerifyFlow.signup,
          phone: phone,
          verificationId: verificationId,
          resendToken: resendToken,
@@ -74,17 +68,6 @@ class VerifyCodeArgs {
          selectedCarModel: selectedCarModel,
          plateNumber: plateNumber,
          selectedCarColor: selectedCarColor,
-       );
-
-  const VerifyCodeArgs.forgotPassword({
-    required String phone,
-    String verificationId = '',
-    int? resendToken,
-  }) : this._(
-         flow: VerifyFlow.forgotPassword,
-         phone: phone,
-         verificationId: verificationId,
-         resendToken: resendToken,
        );
 }
 
@@ -240,134 +223,122 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
         throw Exception('No user after verification.');
       }
 
-      if (widget.args.flow == VerifyFlow.signup) {
-        final email = widget.args.email!;
-        final password = widget.args.password!;
+      final email = widget.args.email!;
+      final password = widget.args.password!;
 
-        try {
-          final emailCred = EmailAuthProvider.credential(
-            email: email.trim(),
-            password: password,
-          );
-          await user.linkWithCredential(emailCred);
-        } on FirebaseAuthException catch (e) {
-          // Ignore provider already linked, otherwise rethrow.
-          if (e.code != 'provider-already-linked') rethrow;
-        }
+      try {
+        final emailCred = EmailAuthProvider.credential(
+          email: email.trim(),
+          password: password,
+        );
+        await user.linkWithCredential(emailCred);
+      } on FirebaseAuthException catch (e) {
+        // Ignore provider already linked, otherwise rethrow.
+        if (e.code != 'provider-already-linked') rethrow;
+      }
 
-        // Upload licenses to Cloudinary
-        String? driverUrl;
-        String? carUrl;
+      // Upload licenses to Cloudinary
+      String? driverUrl;
+      String? carUrl;
 
-        try {
-          driverUrl = await _uploadImageToCloudinary(
-            widget.args.driverLicenseFile!,
-            'license',
-          );
-        } catch (e) {
-          debugPrint(
-            'VerifyCodeScreen._verify: Driver license upload failed: $e',
-          );
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Driver license upload failed: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-
-        try {
-          carUrl = await _uploadImageToCloudinary(
-            widget.args.carLicenseFile!,
-            'license',
-          );
-        } catch (e) {
-          debugPrint('VerifyCodeScreen._verify: Car license upload failed: $e');
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Car license upload failed: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-
-        // Upload profile picture to Cloudinary if provided (optional)
-        String? profilePictureUrl;
-        if (widget.args.profilePicture != null) {
-          try {
-            final imageFile = widget.args.profilePicture!;
-            profilePictureUrl = await CloudinaryService.uploadProfileImage(
-              File(imageFile.path),
-            );
-          } catch (e) {
-            debugPrint(
-              'VerifyCodeScreen._verify: Profile picture upload failed: $e',
-            );
-            // Continue even if profile picture fails
-          }
-        }
-
-        // Create car details
-
-        // Create user profile (toMap writes profilePictureUrl + profileImageUrl when set)
-
-        // Update Firebase Authentication user profile
-        final displayName =
-            '${widget.args.firstName ?? ''} ${widget.args.lastName ?? ''}'
-                .trim();
-        if (displayName.isNotEmpty) {
-          await user.updateDisplayName(displayName);
-        }
-        if (profilePictureUrl != null && profilePictureUrl.isNotEmpty) {
-          await user.updatePhotoURL(profilePictureUrl);
-        }
-
-        // Save full profile + signup media URLs to Firestore
-        // Store Cloudinary URLs with complete user data
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'userId': user.uid,
-          'firstName': widget.args.firstName,
-          'lastName': widget.args.lastName,
-          'email': email.trim(),
-          'phone': widget.args.phone,
-          'phone_verified': true,
-          'profileImage': profilePictureUrl, // Cloudinary URL
-          'licenseImage': driverUrl, // Cloudinary URL (driver license)
-          'carLicenseImage': carUrl, // Cloudinary URL (car license)
-          'carDetails': {
-            'model': widget.args.selectedCarModel,
-            'plateNumber': widget.args.plateNumber,
-            'color': widget.args.selectedCarColor,
-          },
-          'profilePictureUrl': profilePictureUrl, // For compatibility
-          'driver_license_url': driverUrl,
-          'car_license_url': carUrl,
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
+      try {
+        driverUrl = await _uploadImageToCloudinary(
+          widget.args.driverLicenseFile!,
+          'license',
+        );
+      } catch (e) {
+        debugPrint(
+          'VerifyCodeScreen._verify: Driver license upload failed: $e',
+        );
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Phone verified. Account created!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text('Driver license upload failed: $e'),
+            backgroundColor: Colors.red,
           ),
         );
-        Navigator.pushNamedAndRemoveUntil(context, 'home', (route) => false);
         return;
       }
 
-      // Forgot password (Firebase-only): after OTP, user is signed in -> allow updating password.
+      try {
+        carUrl = await _uploadImageToCloudinary(
+          widget.args.carLicenseFile!,
+          'license',
+        );
+      } catch (e) {
+        debugPrint('VerifyCodeScreen._verify: Car license upload failed: $e');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Car license upload failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Upload profile picture to Cloudinary if provided (optional)
+      String? profilePictureUrl;
+      if (widget.args.profilePicture != null) {
+        try {
+          final imageFile = widget.args.profilePicture!;
+          profilePictureUrl = await CloudinaryService.uploadProfileImage(
+            File(imageFile.path),
+          );
+        } catch (e) {
+          debugPrint(
+            'VerifyCodeScreen._verify: Profile picture upload failed: $e',
+          );
+          // Continue even if profile picture fails
+        }
+      }
+
+      // Create car details
+
+      // Create user profile (toMap writes profilePictureUrl + profileImageUrl when set)
+
+      // Update Firebase Authentication user profile
+      final displayName =
+          '${widget.args.firstName ?? ''} ${widget.args.lastName ?? ''}'.trim();
+      if (displayName.isNotEmpty) {
+        await user.updateDisplayName(displayName);
+      }
+      if (profilePictureUrl != null && profilePictureUrl.isNotEmpty) {
+        await user.updatePhotoURL(profilePictureUrl);
+      }
+
+      // Save full profile + signup media URLs to Firestore
+      // Store Cloudinary URLs with complete user data
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'userId': user.uid,
+        'firstName': widget.args.firstName,
+        'lastName': widget.args.lastName,
+        'email': email.trim(),
+        'phone': widget.args.phone,
+        'profileImage': profilePictureUrl, // Cloudinary URL
+        'licenseImage': driverUrl, // Cloudinary URL (driver license)
+        'carLicenseImage': carUrl, // Cloudinary URL (car license)
+        'carDetails': {
+          'model': widget.args.selectedCarModel,
+          'plateNumber': widget.args.plateNumber,
+          'color': widget.args.selectedCarColor,
+        },
+        'profilePictureUrl': profilePictureUrl, // For compatibility
+        'driver_license_url': driverUrl,
+        'car_license_url': carUrl,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
       if (!mounted) return;
-      Navigator.pushNamed(
-        context,
-        'reset-password',
-        arguments: const ResetPasswordArgs.forgotPassword(),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Phone verified. Account created!'),
+          backgroundColor: Colors.green,
+        ),
       );
+      Navigator.pushNamedAndRemoveUntil(context, 'home', (route) => false);
+      return;
     } on FirebaseAuthException catch (e) {
       debugPrint(
         'VerifyCodeScreen._verify FirebaseAuthException: ${e.code} ${e.message}',

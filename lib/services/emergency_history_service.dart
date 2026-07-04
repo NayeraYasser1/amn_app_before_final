@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/emergency_event.dart';
@@ -59,8 +60,12 @@ class EmergencyHistoryService {
 
     await _saveLocalEvent(event);
 
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
     try {
       await _collection.add({
+        'userId': user.uid,
         'type': type,
         'title': title,
         'description': description,

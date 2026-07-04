@@ -1,0 +1,58 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function doesNotWriteVerificationFlags() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['email_verified', 'phone_verified']);
+    }
+
+    function doesNotCreateVerificationFlags() {
+      return !request.resource.data.keys()
+        .hasAny(['email_verified', 'phone_verified']);
+    }
+
+    function hasOwnerField() {
+      return request.resource.data.userId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && doesNotCreateVerificationFlags()
+        && hasOwnerField();
+      allow update: if isOwner(userId)
+        && doesNotWriteVerificationFlags()
+        && request.resource.data.userId == userId;
+      allow delete: if isOwner(userId);
+    }
+
+    match /emergency_events/{eventId} {
+      allow create: if signedIn() && hasOwnerField();
+      allow read, update, delete: if signedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    match /usage_events/{eventId} {
+      allow create: if signedIn() && hasOwnerField();
+      allow read, update, delete: if signedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    match /user_status/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

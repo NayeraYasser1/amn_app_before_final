@@ -128,10 +128,10 @@ class _MyAppState extends State<MyApp> {
         'forgot-password': (context) => const ForgotPasswordScreen(),
         'verify-code': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
-          final verifyArgs = args is VerifyCodeArgs
-              ? args
-              : const VerifyCodeArgs.forgotPassword(phone: '');
-          return VerifyCodeScreen(args: verifyArgs);
+          if (args is VerifyCodeArgs) {
+            return VerifyCodeScreen(args: args);
+          }
+          return const LoginScreen();
         },
         'email-verification': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;

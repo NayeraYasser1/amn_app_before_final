@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:amn_app/widgets/my_buttons.dart';
-import 'verify_code_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -11,35 +10,26 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   bool _isSending = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
-  String _normalizePhone(String input) {
-    final trimmed = input.trim();
-    if (trimmed.isEmpty) return '';
-    // Keep a leading '+' if present; remove other non-digits.
-    final hasPlus = trimmed.startsWith('+');
-    final digits = trimmed.replaceAll(RegExp(r'\D'), '');
-    return hasPlus ? '+$digits' : digits;
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
   }
 
-  Future<void> _sendSmsCode() async {
-    final phone = _normalizePhone(_phoneController.text);
-    if (phone.isEmpty) return;
-    if (!phone.startsWith('+') || phone.length < 9) {
+  Future<void> _sendResetLink() async {
+    final email = _emailController.text.trim();
+    if (!_isValidEmail(email)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Enter phone in international format, e.g. +201234567890',
-          ),
+          content: Text('Enter a valid email address.'),
           backgroundColor: Colors.orange,
-          duration: Duration(seconds: 4),
         ),
       );
       return;
@@ -47,42 +37,51 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isSending = true);
     try {
-      await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: phone,
-        verificationCompleted: (_) {},
-        verificationFailed: (e) {
-          debugPrint(
-            'ForgotPasswordScreen._sendSmsCode verificationFailed: ${e.code} ${e.message}',
-          );
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Unable to send verification SMS. Please try again later.',
-                ),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        },
-        codeSent: (verificationId, forceResendingToken) {
-          // The SMS dispatch can arrive seconds later; if the user left the
-          // screen, the context is deactivated and pushNamed would throw.
-          if (!mounted) return;
-          Navigator.pushNamed(
-            context,
-            'verify-code',
-            arguments: VerifyCodeArgs.forgotPassword(
-              phone: phone,
-              verificationId: verificationId,
-              resendToken: forceResendingToken,
-            ),
-          );
-        },
-        codeAutoRetrievalTimeout: (_) {},
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password reset link sent. Check your email.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      Navigator.pop(context);
+    } on FirebaseAuthException catch (e) {
+      debugPrint(
+        'ForgotPasswordScreen._sendResetLink failed: ${e.code} ${e.message}',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_resetErrorMessage(e.code)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      debugPrint('ForgotPasswordScreen._sendResetLink unexpected error: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to send reset link. Please try again later.'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  String _resetErrorMessage(String code) {
+    switch (code) {
+      case 'invalid-email':
+        return 'Enter a valid email address.';
+      case 'user-disabled':
+        return 'This account is disabled. Contact support for help.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please wait a bit and try again.';
+      default:
+        return 'Unable to send reset link. Please try again later.';
     }
   }
 
@@ -125,27 +124,30 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  "Don't worry! It happens. Please enter the phone number associated with your account.",
+                  "Don't worry! It happens. Enter your account email and we'll send you a reset link.",
                   style: TextStyle(fontSize: 14, color: Colors.white),
                 ),
               ),
               const SizedBox(height: 40),
 
-              // Phone number Field
+              // Email Field
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  "Phone number",
+                  "Email",
                   style: TextStyle(fontSize: 16, color: Colors.white),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.done,
+                autocorrect: false,
+                enableSuggestions: false,
                 style: const TextStyle(color: Colors.black),
                 decoration: InputDecoration(
-                  hintText: "e.g. +201234567890",
+                  hintText: "Enter your email",
                   hintStyle: TextStyle(color: Colors.grey[600]),
                   filled: true,
                   fillColor: Colors.white,
@@ -161,15 +163,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
               const SizedBox(height: 30),
 
-              // Send code Button
+              // Send reset link Button
               _isSending
                   ? const Center(
                       child: CircularProgressIndicator(color: Colors.white),
                     )
                   : MyButton(
                       color: const Color(0xFF1F1D1D),
-                      title: "Send code",
-                      onPressed: _sendSmsCode,
+                      title: "Send reset link",
+                      onPressed: _sendResetLink,
                     ),
               const SizedBox(height: 40),
 

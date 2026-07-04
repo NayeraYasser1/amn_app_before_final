@@ -85,6 +85,7 @@ class _CarInformationScreenState extends State<CarInformationScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'userId': user.uid,
           'carInfo': {
             'model': _carModelController.text.trim(),
             'name': _carNameController.text.trim(),

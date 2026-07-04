@@ -65,6 +65,7 @@ class _DriverLicenseScreenState extends State<DriverLicenseScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'userId': user.uid,
           'driverLicenseImagePath': _licenseImagePath,
         }, SetOptions(merge: true));
       }

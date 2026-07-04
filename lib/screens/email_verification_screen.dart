@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class EmailVerificationArgs {
   final String userEmail;
@@ -95,16 +94,6 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           setState(() {
             _isVerified = true;
           });
-
-          // Update Firestore to mark email as verified
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(widget.args.userId)
-              .update({
-                'email_verified': true,
-                'email_verified_at': FieldValue.serverTimestamp(),
-                'updatedAt': FieldValue.serverTimestamp(),
-              });
 
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
