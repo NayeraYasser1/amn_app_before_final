@@ -471,14 +471,19 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
     String number,
     String reply,
   ) async {
-    await EmergencyHistoryService.logEvent(
-      type: 'emergency_call',
-      title: '$label Call',
-      description: 'Called $number by voice',
-      status: 'Completed',
-    );
+    // Dial FIRST, and never let a history write block or fail the call: the
+    // log is fire-and-forget with its error swallowed. Previously a throwing
+    // logEvent ran before the dial and could stop an emergency call entirely.
     await _setAssistantReply(reply, speak: true);
     await _launchDial(number);
+    unawaited(
+      EmergencyHistoryService.logEvent(
+        type: 'emergency_call',
+        title: '$label Call',
+        description: 'Called $number by voice',
+        status: 'Completed',
+      ).catchError((_) {}),
+    );
     return true;
   }
 
@@ -529,14 +534,18 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
 
     final name = (found['name'] ?? '').toString();
     final phone = (found['phone'] ?? '').toString();
-    await EmergencyHistoryService.logEvent(
-      type: 'contact_call',
-      title: 'Contact Call',
-      description: 'Called $name by voice',
-      status: 'Completed',
-    );
+    // Dial first; log fire-and-forget so a history-write failure can never
+    // block the call.
     await _setAssistantReply('Calling $name.', speak: true);
     await _launchDial(phone);
+    unawaited(
+      EmergencyHistoryService.logEvent(
+        type: 'contact_call',
+        title: 'Contact Call',
+        description: 'Called $name by voice',
+        status: 'Completed',
+      ).catchError((_) {}),
+    );
     return true;
   }
 
@@ -698,27 +707,32 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   // "Send SOS": dials the ambulance and opens the full active-SOS screen so
   // the same alert path as the home button runs — location resolve + SOS SMS
   // to the default emergency contact + live timer — not just a bare dial.
+  //
+  // No explicit "Started" log here: the active-SOS screen records its own SOS
+  // events (SMS sent/failed, marked safe) and the caller logs a generic
+  // "Voice Command" entry, so a log here would just duplicate history.
   Future<bool> _sendSosByVoice() async {
-    unawaited(
-      EmergencyHistoryService.logEvent(
-        type: 'sos',
-        title: 'SOS Ambulance Call Started',
-        description: 'SOS triggered by voice command',
-        status: 'Started',
-      ).catchError((_) {}),
-    );
     await _setAssistantReply(
       'Sending SOS. Calling the ambulance and alerting your emergency contact now.',
       speak: true,
     );
     await _launchDial(EmergencyNumbers.ambulance);
+    if (!mounted) return true;
+    // Await the active-SOS screen so we can clear the stale "Sending SOS..."
+    // reply once the user returns, instead of leaving the voice screen frozen
+    // mid-action.
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const EmergencyServicesScreen(startActive: true),
+      ),
+    );
     if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const EmergencyServicesScreen(startActive: true),
-        ),
-      );
+      setState(() {
+        _recognizedText = '';
+        _assistantReply =
+            'I am ready. Say a command and I will route it correctly.';
+      });
     }
     return true;
   }
@@ -975,11 +989,13 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
         if (targets.contains('app')) {
           final handled = await _handleLocalAppAction(match, text);
           if (handled) {
-            await EmergencyHistoryService.logEvent(
-              type: 'voice_command',
-              title: 'Voice Command',
-              description: text,
-              status: 'Completed',
+            unawaited(
+              EmergencyHistoryService.logEvent(
+                type: 'voice_command',
+                title: 'Voice Command',
+                description: text,
+                status: 'Completed',
+              ).catchError((_) {}),
             );
             return;
           }
@@ -1001,11 +1017,13 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
           'ok': result['ok'] == true,
         },
       );
-      await EmergencyHistoryService.logEvent(
-        type: 'voice_command',
-        title: 'Voice Command',
-        description: text,
-        status: result['ok'] == true ? 'Completed' : 'Failed',
+      unawaited(
+        EmergencyHistoryService.logEvent(
+          type: 'voice_command',
+          title: 'Voice Command',
+          description: text,
+          status: result['ok'] == true ? 'Completed' : 'Failed',
+        ).catchError((_) {}),
       );
       await _setAssistantReply(reply, speak: true);
       await _refreshBridgeStatus();
@@ -1014,11 +1032,13 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
 
     final handled = await _handleLocalAppAction(match, text);
     if (handled) {
-      await EmergencyHistoryService.logEvent(
-        type: 'voice_command',
-        title: 'Voice Command',
-        description: text,
-        status: 'Completed',
+      unawaited(
+        EmergencyHistoryService.logEvent(
+          type: 'voice_command',
+          title: 'Voice Command',
+          description: text,
+          status: 'Completed',
+        ).catchError((_) {}),
       );
     }
     if (!handled) {
