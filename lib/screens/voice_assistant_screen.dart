@@ -49,6 +49,9 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   bool _handlingFinalResult = false;
   bool _cancelRequested = false;
   bool _bridgeConnected = false;
+  // Bumped on every new listen attempt so a stale watchdog can tell it belongs
+  // to an older session and must not touch the current one.
+  int _listenSession = 0;
   String _recognizedText = '';
   String _assistantReply = 'Tap the microphone and tell AMN what you need.';
   List<Map<String, dynamic>> _catalog = const [];
@@ -109,6 +112,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
     try {
       final available = await _speech.initialize(
         onStatus: (status) {
+          if (!mounted) return;
           if (status == 'done' || status == 'notListening') {
             _maybeHandleFinalUtterance();
           }
@@ -160,6 +164,11 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   }
 
   Future<void> _initTts() async {
+    // Every TTS call has a 3s timeout: on the Samsung engines these can hang on
+    // a dead binding, and because _initTts is awaited before speech init, a
+    // hang would freeze the screen on "Preparing voice assistant..." forever.
+    // A timeout just abandons the wait; the assistant still starts.
+    const limit = Duration(seconds: 3);
     try {
       // Prefer Google TTS when it is installed. Some Samsung devices default to
       // an engine that repeatedly disconnects (DeadObjectException) and never
@@ -168,21 +177,21 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
         // Only switch engines when the device default is NOT already Google.
         // Re-binding an already-Google engine disturbs the shared audio path
         // and can make the very next speech-recognition start fail.
-        final current = (await _tts.getDefaultEngine)?.toString();
+        final current = (await _tts.getDefaultEngine.timeout(limit))?.toString();
         if (current != 'com.google.android.tts') {
-          final engines = await _tts.getEngines;
+          final engines = await _tts.getEngines.timeout(limit);
           if (engines is List && engines.contains('com.google.android.tts')) {
-            await _tts.setEngine('com.google.android.tts');
+            await _tts.setEngine('com.google.android.tts').timeout(limit);
           }
         }
       } catch (_) {}
-      await _tts.setSpeechRate(0.48);
-      await _tts.setPitch(1.0);
-      await _tts.setVolume(1.0);
+      await _tts.setSpeechRate(0.48).timeout(limit);
+      await _tts.setPitch(1.0).timeout(limit);
+      await _tts.setVolume(1.0).timeout(limit);
       _ttsAvailable = true;
     } catch (e) {
-      // No usable TTS engine — spoken replies become a no-op, but the assistant
-      // must still start and work on-screen via the tap commands.
+      // No usable TTS engine (or it hung) — spoken replies become a no-op, but
+      // the assistant must still start and work on-screen via the tap commands.
       _ttsAvailable = false;
       debugPrint('TTS init failed: $e');
     }
@@ -1151,6 +1160,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
       // immediately — the engine can take a few seconds to confirm.
       _listening = true;
     });
+    final int sessionId = ++_listenSession;
 
     bool started = await _beginListenSession();
     if (!started && mounted) {
@@ -1168,6 +1178,23 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
     if (!mounted) return;
     if (started) {
       UsageLogger.logAction('voice_assistant_start');
+      // Safety net for the rare case where the platform accepts listen() but
+      // never actually starts and never fires a status/error callback: the mic
+      // would otherwise sit on "Listening..." forever. After the max listen
+      // window, if THIS session is still listening with nothing captured and no
+      // command in flight, reset it. It never retries, so it cannot cause a
+      // false "could not start listening". The session id guards against a
+      // newer listen having started in the meantime.
+      Future.delayed(const Duration(seconds: 16), () {
+        if (!mounted || sessionId != _listenSession) return;
+        if (_listening && !_handlingFinalResult && _recognizedText.isEmpty) {
+          setState(() {
+            _listening = false;
+            _assistantReply =
+                'I did not hear anything. Tap the microphone and try again.';
+          });
+        }
+      });
     } else {
       setState(() => _listening = false);
       await _setAssistantReply(
@@ -1202,14 +1229,14 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
           listenMode: stt.ListenMode.confirmation,
         ),
       );
-      // IMPORTANT: speech_to_text's listen() returns void (a Future<Null>) and
-      // signals failure by THROWING, not by returning false. Do not read its
-      // return value — assigning the null result to a bool threw
+      // IMPORTANT (speech_to_text 7.x): listen() does not return a usable
+      // value — it completes with null and signals failure by THROWING, not by
+      // returning false. Reading its result as a bool previously threw
       // "'Null' is not a subtype of bool" on every tap, which surfaced as
       // "I could not start listening" even though the recognizer had started.
-      // (isListening is set later by an async status callback, so it is not yet
-      // reliable here.) Reaching this line without an exception means the
-      // recognizer started.
+      // isListening is only set later by an async status callback, so it is not
+      // reliable here. Reaching this line without an exception means listening
+      // started; the watchdog in _toggleListening covers a silent non-start.
       return true;
     } catch (e) {
       // A real failure (e.g. ListenFailedException) must not strand the mic in
