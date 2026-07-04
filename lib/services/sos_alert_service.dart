@@ -1,7 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'emergency_contacts_repository.dart';
 
 /// Sends real SOS alert SMS messages silently in the background through the
 /// native Android SmsManager (channel `amn_app/sms`), so the emergency call
@@ -46,55 +45,14 @@ class SosAlertService {
     }
   }
 
-  static List<Map<String, dynamic>> _decodeList(String? raw) {
-    if (raw == null || raw.isEmpty) return [];
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is List) {
-        return decoded.whereType<Map<String, dynamic>>().toList();
-      }
-    } catch (_) {}
-    return [];
-  }
+  /// The Safety Hub contact marked as the SOS default. Delegates to the shared
+  /// [EmergencyContactsRepository] so contact selection lives in one place;
+  /// returns null when no contact is saved (never a seed).
+  static Future<Map<String, String>?> firstEmergencyContact() =>
+      EmergencyContactsRepository.defaultContact();
 
-  /// The Safety Hub contact marked as the SOS default (falling back to the
-  /// first saved contact). Returns null when the user has saved no contacts —
-  /// SOS must never text a placeholder/seed number that could belong to a real
-  /// stranger, so callers treat null as "no contact configured".
-  static Future<Map<String, String>?> firstEmergencyContact() async {
-    final prefs = await SharedPreferences.getInstance();
-    final contacts = _decodeList(prefs.getString('safety_hub_contacts_json'));
-    if (contacts.isEmpty) return null;
-    final chosen = contacts.firstWhere(
-      (c) => c['default'] == true,
-      orElse: () => contacts.first,
-    );
-    final phone = (chosen['phone'] ?? '').toString().trim();
-    if (phone.isEmpty) return null;
-    return {
-      'name': (chosen['name'] ?? '').toString(),
-      'phone': phone,
-      'relationship': (chosen['relationship'] ?? '').toString(),
-    };
-  }
-
-  /// The Safety Hub hospital marked as the SOS default (falling back to the
-  /// first saved hospital). Returns null when none are saved, or when the saved
-  /// number is a short code (<= 6 digits) — Egyptian hospital hotlines like
-  /// 19885 are voice-only and cannot receive an SMS, so we never pretend to
-  /// text one.
-  static Future<Map<String, String>?> firstHospital() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hospitals = _decodeList(prefs.getString('safety_hub_hospitals_json'));
-    if (hospitals.isEmpty) return null;
-    final chosen = hospitals.firstWhere(
-      (h) => h['default'] == true,
-      orElse: () => hospitals.first,
-    );
-    final phone = (chosen['phone'] ?? '').toString().trim();
-    if (phone.isEmpty) return null;
-    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.length <= 6) return null;
-    return {'name': (chosen['name'] ?? '').toString(), 'phone': phone};
-  }
+  /// The Safety Hub hospital marked as the SOS default. Delegates to the shared
+  /// [EmergencyContactsRepository] (which also rejects voice-only short codes).
+  static Future<Map<String, String>?> firstHospital() =>
+      EmergencyContactsRepository.defaultHospital();
 }

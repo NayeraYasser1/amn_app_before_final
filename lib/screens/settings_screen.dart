@@ -9,11 +9,12 @@ import 'emergency_history_screen.dart';
 import 'home_page.dart';
 import 'voice_assistant_screen.dart';
 import '../services/preferences_service.dart';
+import '../theme/app_colors.dart';
 import '../utils/locale_helper.dart';
 
 // Match the app-wide bottom navigation style used on Home/Assistant/History.
-const Color _navBg = Color(0xFF020607);
-const Color _navBorder = Color(0xFF2C3136);
+const Color _navBg = AppColors.background;
+const Color _navBorder = AppColors.border;
 
 class SettingsScreen extends StatefulWidget {
   final void Function(Locale)? onLocaleChanged;

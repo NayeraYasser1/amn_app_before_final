@@ -159,36 +159,4 @@ class EmergencyHistoryService {
   static Stream<List<EmergencyEvent>> eventsStream() {
     return localEventsStream();
   }
-
-  static Stream<List<EmergencyEvent>> firestoreEventsStream() {
-    // Bounded so a growing collection never streams every document (unbounded
-    // reads + memory). The local history is the primary source; this mirror is
-    // capped to the most recent 200 to match _saveLocalEvent's cap.
-    return _collection
-        .orderBy('timestamp', descending: true)
-        .limit(200)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        final timestamp = data['timestamp'];
-        DateTime ts;
-        if (timestamp is Timestamp) {
-          ts = timestamp.toDate();
-        } else {
-          ts = DateTime.tryParse(timestamp?.toString() ?? '') ?? DateTime.now();
-        }
-
-        return EmergencyEvent(
-          id: doc.id,
-          type: data['type'] as String? ?? 'unknown',
-          title: data['title'] as String? ?? 'Emergency',
-          description: data['description'] as String?,
-          location: data['location'] as String?,
-          status: data['status'] as String? ?? 'Resolved',
-          timestamp: ts,
-        );
-      }).toList();
-    });
-  }
 }

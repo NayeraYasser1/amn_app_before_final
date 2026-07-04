@@ -5,15 +5,16 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/emergency_history_service.dart';
 import '../services/usage_logger.dart';
+import '../theme/app_colors.dart';
 import 'emergency_history_screen.dart';
 import 'settings_screen.dart';
 import 'voice_assistant_screen.dart';
 
-const Color _bg = Color(0xFF020607);
-const Color _card = Color(0xFF121417);
-const Color _border = Color(0xFF2D3238);
-const Color _red = Color(0xFFE81218);
-const Color _muted = Color(0xFFB7BABF);
+const Color _bg = AppColors.background;
+const Color _card = AppColors.card;
+const Color _border = AppColors.border;
+const Color _red = AppColors.red;
+const Color _muted = AppColors.muted;
 
 // Car Service opens the device's Google Maps app with a "car repair near me"
 // search at the user's location. This needs no Google Maps API key or billing

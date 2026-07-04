@@ -10,10 +10,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/emergency_contacts_repository.dart';
 import '../services/emergency_history_service.dart';
 import '../services/maintenance_reminders_service.dart';
 import '../services/usage_logger.dart';
 import '../services/voice_command_sync_service.dart';
+import '../utils/emergency_numbers.dart';
 import 'engine_status_screen.dart';
 import 'edit_profile_screen.dart';
 import 'emergency_history_screen.dart';
@@ -327,13 +329,21 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
     // Actions with custom behaviour.
     switch (action) {
       case 'dial_police':
-        return _callEmergencyService('Police', '122', reply);
+        return _callEmergencyService('Police', EmergencyNumbers.police, reply);
       case 'dial_ambulance':
-        return _callEmergencyService('Ambulance', '123', reply);
+        return _callEmergencyService(
+          'Ambulance',
+          EmergencyNumbers.ambulance,
+          reply,
+        );
       case 'dial_fire':
-        return _callEmergencyService('Fire', '180', reply);
+        return _callEmergencyService('Fire', EmergencyNumbers.fire, reply);
       case 'dial_traffic':
-        return _callEmergencyService('Traffic Police', '128', reply);
+        return _callEmergencyService(
+          'Traffic Police',
+          EmergencyNumbers.traffic,
+          reply,
+        );
       case 'call_contact':
         return _callContactByName(_extractSlot(item, recognized));
       case 'find_my_car':
@@ -483,30 +493,15 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
       return true;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('safety_hub_contacts_json');
-    final contacts = <Map<String, dynamic>>[];
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is List) {
-          contacts.addAll(decoded.whereType<Map<String, dynamic>>());
-        }
-      } catch (_) {}
-    }
+    final contacts = await EmergencyContactsRepository.loadContacts();
     if (contacts.isEmpty) {
-      // Safety hub has not persisted contacts yet — use its default seeds.
-      contacts.addAll(const [
-        {'name': 'Nayera', 'phone': '01012345678', 'relationship': 'Mom'},
-        {'name': 'Amir', 'phone': '01023456789', 'relationship': 'Dad'},
-        {'name': 'Hussein', 'phone': '01098765432', 'relationship': 'Husband'},
-        {
-          'name': 'Marian',
-          'phone': '01234567890',
-          'relationship': 'Best friend',
-        },
-        {'name': 'Shady', 'phone': '01112223333', 'relationship': 'Neighbour'},
-      ]);
+      // Never dial a placeholder/seed number — it could belong to a real
+      // stranger. Tell the user to add a real contact instead.
+      await _setAssistantReply(
+        'You have no emergency contacts saved yet. Add one in the Safety Hub first.',
+        speak: true,
+      );
+      return true;
     }
 
     Map<String, dynamic>? found;
@@ -716,7 +711,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
       'Sending SOS. Calling the ambulance and alerting your emergency contact now.',
       speak: true,
     );
-    await _launchDial('123');
+    await _launchDial(EmergencyNumbers.ambulance);
     if (mounted) {
       Navigator.push(
         context,

@@ -7,11 +7,13 @@ import 'package:http/http.dart' as http;
 // Hide latlong2's `Path` so it doesn't clash with dart:ui's Path.
 import 'package:latlong2/latlong.dart' hide Path;
 
-const Color _bg = Color(0xFF020607);
-const Color _card = Color(0xFF121417);
-const Color _border = Color(0xFF2D3238);
-const Color _red = Color(0xFFE81218);
-const Color _muted = Color(0xFFB7BABF);
+import '../theme/app_colors.dart';
+
+const Color _bg = AppColors.background;
+const Color _card = AppColors.card;
+const Color _border = AppColors.border;
+const Color _red = AppColors.red;
+const Color _muted = AppColors.muted;
 
 const String _osmTileTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 

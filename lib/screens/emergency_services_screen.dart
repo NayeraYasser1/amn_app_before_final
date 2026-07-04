@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/emergency_contacts_repository.dart';
 import '../services/emergency_history_service.dart';
 import '../services/sos_alert_service.dart';
+import '../theme/app_colors.dart';
+import '../utils/emergency_numbers.dart';
 import '../utils/phone.dart';
 import '../services/usage_logger.dart';
 import 'emergency_history_screen.dart';
@@ -17,15 +19,15 @@ import 'safety_hub_screen.dart';
 import 'settings_screen.dart';
 import 'voice_assistant_screen.dart';
 
-const Color _bg = Color(0xFF020607);
-const Color _card = Color(0xFF121417);
-const Color _border = Color(0xFF2D3238);
-const Color _red = Color(0xFFE81218);
-const Color _green = Color(0xFF39D74A);
-const Color _muted = Color(0xFFB7BABF);
-const String _ambulanceNumber = '123';
-const String _policeNumber = '122';
-const String _fireNumber = '180';
+const Color _bg = AppColors.background;
+const Color _card = AppColors.card;
+const Color _border = AppColors.border;
+const Color _red = AppColors.red;
+const Color _green = AppColors.green;
+const Color _muted = AppColors.muted;
+const String _ambulanceNumber = EmergencyNumbers.ambulance;
+const String _policeNumber = EmergencyNumbers.police;
+const String _fireNumber = EmergencyNumbers.fire;
 const int _sosHoldSeconds = 3;
 
 enum _SosStage { button, active, resolved }
@@ -194,17 +196,7 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
   }
 
   Future<void> _loadContacts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('safety_hub_contacts_json');
-    final contacts = <Map<String, dynamic>>[];
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is List) {
-          contacts.addAll(decoded.whereType<Map<String, dynamic>>());
-        }
-      } catch (_) {}
-    }
+    final contacts = await EmergencyContactsRepository.loadContacts();
     if (!mounted) return;
     setState(() => _contacts = contacts);
   }

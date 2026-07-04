@@ -3,14 +3,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-const Color _background = Color(0xFF020607);
-const Color _card = Color(0xFF121417);
-const Color _cardRaised = Color(0xFF17191D);
-const Color _border = Color(0xFF2C3136);
-const Color _red = Color(0xFFE81218);
-const Color _green = Color(0xFF45D64A);
-const Color _yellow = Color(0xFFFFC928);
-const Color _muted = Color(0xFFB7BABF);
+import '../theme/app_colors.dart';
+
+const Color _background = AppColors.background;
+const Color _card = AppColors.card;
+const Color _cardRaised = AppColors.cardRaised;
+const Color _border = AppColors.border;
+const Color _red = AppColors.red;
+const Color _green = AppColors.green;
+const Color _yellow = AppColors.yellow;
+const Color _muted = AppColors.muted;
 
 enum _EngineLevel { normal, caution, fault }
 

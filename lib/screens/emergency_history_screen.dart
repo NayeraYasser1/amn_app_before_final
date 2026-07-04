@@ -4,18 +4,19 @@ import 'package:flutter/services.dart';
 import '../models/emergency_event.dart';
 import '../services/emergency_history_service.dart';
 import '../services/usage_logger.dart';
+import '../theme/app_colors.dart';
 import 'settings_screen.dart';
 import 'voice_assistant_screen.dart';
 
-const Color _background = Color(0xFF020607);
-const Color _card = Color(0xFF121417);
-const Color _border = Color(0xFF2C3136);
-const Color _red = Color(0xFFE81218);
-const Color _green = Color(0xFF45D64A);
-const Color _orange = Color(0xFFFF9E2C);
-const Color _blue = Color(0xFF0F7CFF);
-const Color _purple = Color(0xFFB15CFF);
-const Color _muted = Color(0xFFB7BABF);
+const Color _background = AppColors.background;
+const Color _card = AppColors.card;
+const Color _border = AppColors.border;
+const Color _red = AppColors.red;
+const Color _green = AppColors.green;
+const Color _orange = AppColors.orange;
+const Color _blue = AppColors.blue;
+const Color _purple = AppColors.purple;
+const Color _muted = AppColors.muted;
 
 enum _HistoryFilter { all, sos, service, parking, voice, calls }
 

@@ -5,14 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/usage_logger.dart';
+import '../theme/app_colors.dart';
 
-const Color _bg = Color(0xFF020607);
-const Color _card = Color(0xFF121417);
-const Color _border = Color(0xFF2D3238);
-const Color _red = Color(0xFFE81218);
-const Color _blue = Color(0xFF087BFF);
-const Color _green = Color(0xFF39D74A);
-const Color _muted = Color(0xFFB7BABF);
+const Color _bg = AppColors.background;
+const Color _card = AppColors.card;
+const Color _border = AppColors.border;
+const Color _red = AppColors.red;
+const Color _blue = AppColors.blue;
+const Color _green = AppColors.green;
+const Color _muted = AppColors.muted;
 
 enum _PairingStage {
   start,

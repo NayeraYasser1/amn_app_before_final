@@ -11,6 +11,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/emergency_history_service.dart';
 import '../services/maintenance_reminders_service.dart';
 import '../services/usage_logger.dart';
+import '../theme/app_colors.dart';
+import '../utils/emergency_numbers.dart';
 import 'settings_screen.dart';
 import 'emergency_services_screen.dart';
 import 'parking_map_screen.dart';
@@ -22,14 +24,14 @@ import 'emergency_history_screen.dart';
 import 'roadside_assistance_screen.dart';
 import 'safety_hub_screen.dart';
 
-const Color _background = Color(0xFF020607);
-const Color _card = Color(0xFF121417);
-const Color _cardRaised = Color(0xFF17191D);
-const Color _border = Color(0xFF2C3136);
-const Color _red = Color(0xFFE81218);
-const Color _yellow = Color(0xFFFFC928);
-const Color _muted = Color(0xFFB7BABF);
-const String _ambulanceNumber = '123';
+const Color _background = AppColors.background;
+const Color _card = AppColors.card;
+const Color _cardRaised = AppColors.cardRaised;
+const Color _border = AppColors.border;
+const Color _red = AppColors.red;
+const Color _yellow = AppColors.yellow;
+const Color _muted = AppColors.muted;
+const String _ambulanceNumber = EmergencyNumbers.ambulance;
 const int _sosHoldSeconds = 3;
 
 // Real current date/time for the home header (computed each build) instead of

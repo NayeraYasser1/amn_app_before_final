@@ -6,25 +6,26 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/first_aid_content.dart';
+import '../services/emergency_contacts_repository.dart';
 import '../services/emergency_history_service.dart';
 import '../services/usage_logger.dart';
+import '../theme/app_colors.dart';
+import '../utils/emergency_numbers.dart';
 import '../utils/phone.dart';
 import 'emergency_history_screen.dart';
 import 'map_picker_screen.dart';
 import 'settings_screen.dart';
 import 'voice_assistant_screen.dart';
 
-const Color _background = Color(0xFF020607);
-const Color _card = Color(0xFF121417);
-const Color _cardRaised = Color(0xFF17191D);
-const Color _field = Color(0xFF0E1215);
-const Color _border = Color(0xFF2B3036);
-const Color _red = Color(0xFFE81218);
-const Color _green = Color(0xFF45D64A);
-const Color _blue = Color(0xFF0F7CFF);
-const Color _orange = Color(0xFFFF9E2C);
-const Color _purple = Color(0xFFB15CFF);
-const Color _muted = Color(0xFFB7BABF);
+const Color _background = AppColors.background;
+const Color _card = AppColors.card;
+const Color _cardRaised = AppColors.cardRaised;
+const Color _field = AppColors.field;
+const Color _border = AppColors.border;
+const Color _red = AppColors.red;
+const Color _green = AppColors.green;
+const Color _muted = AppColors.muted;
 
 enum _SafetyHubStage {
   home,
@@ -131,375 +132,6 @@ class _Hospital {
   }
 }
 
-class _FirstAidTopic {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final List<String> steps;
-  final String videoQuery;
-
-  const _FirstAidTopic({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.steps,
-    required this.videoQuery,
-  });
-}
-
-// First aid for road-accident injuries.
-const List<_FirstAidTopic> _firstAidTopics = [
-  _FirstAidTopic(
-    title: 'Before Treating Any Injury',
-    subtitle: 'General steps everyone should follow',
-    icon: Icons.shield_outlined,
-    color: _red,
-    videoQuery: 'road accident first aid basics',
-    steps: [
-      'Check that the area is safe from moving vehicles, fire, leaking fuel, broken glass and electrical cables.',
-      'Do not move the injured person unless there is an immediate danger, such as fire or approaching traffic.',
-      'Check whether the person responds and is breathing normally.',
-      'Treat absent breathing and life-threatening bleeding before treating fractures or minor wounds.',
-      'Keep checking the person\'s breathing and responsiveness until professional help arrives.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Unresponsive and not breathing normally',
-    subtitle: 'CPR — 6 steps',
-    icon: Icons.monitor_heart,
-    color: _red,
-    videoQuery: 'CPR chest compressions',
-    steps: [
-      'Lay the person on their back on a firm surface.',
-      'Place both hands in the centre of the chest.',
-      'Give chest compressions at 100–120 compressions per minute, pressing approximately 5–6 cm deep.',
-      'Give 30 compressions followed by 2 rescue breaths when trained and willing; otherwise, continue hands-only CPR.',
-      'Use an AED as soon as one becomes available and follow its instructions.',
-      'Continue until normal breathing returns or professional responders take over.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Unresponsive but breathing normally',
-    subtitle: 'Recovery position — 5 steps',
-    icon: Icons.self_improvement,
-    color: _green,
-    videoQuery: 'recovery position',
-    steps: [
-      'Keep the airway open and continuously watch the chest for breathing.',
-      'Place the person in the recovery position when no spinal injury is suspected.',
-      'When spinal injury is possible, avoid moving them unless vomiting, blood or another obstruction threatens the airway.',
-      'If turning is essential, keep the head, neck and body aligned as much as possible.',
-      'Recheck breathing frequently.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Severe external bleeding',
-    subtitle: '6 steps',
-    icon: Icons.bloodtype,
-    color: _orange,
-    videoQuery: 'severe bleeding direct pressure tourniquet',
-    steps: [
-      'Use gloves or a plastic barrier when available.',
-      'Expose the wound and place clean gauze or cloth directly over it.',
-      'Press firmly and continuously with both hands.',
-      'If blood soaks through, place more material on top without removing the first layer.',
-      'For uncontrollable bleeding from an arm or leg, apply a commercial tourniquet only when trained to use it.',
-      'Keep the person still and warm.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Object embedded in a wound',
-    subtitle: '5 steps',
-    icon: Icons.push_pin,
-    color: Color(0xFFFFA000),
-    videoQuery: 'embedded object in wound',
-    steps: [
-      'Leave the object in its original position.',
-      'Apply pressure to the sides of the wound, not directly over the object.',
-      'Place padding around the object to prevent it from moving.',
-      'Secure the padding gently without pushing the object deeper.',
-      'Monitor the person for bleeding and shock.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Head injury or concussion',
-    subtitle: '6 steps',
-    icon: Icons.psychology,
-    color: _purple,
-    videoQuery: 'head injury concussion',
-    steps: [
-      'Keep the person still and support their head in the position found.',
-      'Check their breathing and level of awareness repeatedly.',
-      'Control scalp bleeding with gentle pressure unless the skull appears damaged or an object is embedded.',
-      'Watch for vomiting, confusion, worsening headache, seizure, unequal pupils or increasing drowsiness.',
-      'If they vomit, turn them carefully while keeping the head, neck and body aligned.',
-      'Do not allow them to stand or walk.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Suspected neck or spinal injury',
-    subtitle: '6 steps',
-    icon: Icons.accessibility_new,
-    color: _blue,
-    videoQuery: 'spinal injury stabilisation',
-    steps: [
-      'Tell the person not to move their head or body.',
-      'Kneel behind the head and hold both sides gently in the position found.',
-      'Keep the head, neck and body aligned.',
-      'Leave a motorcycle helmet in place unless it prevents essential airway care or CPR.',
-      'Treat severe bleeding or absent breathing without unnecessarily twisting the spine.',
-      'Continue supporting the head until professionals take over.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Chest or rib injury',
-    subtitle: '6 steps',
-    icon: Icons.favorite,
-    color: Color(0xFFFFC928),
-    videoQuery: 'chest rib injury',
-    steps: [
-      'Help the conscious person remain in the position that makes breathing easiest.',
-      'Loosen tight clothing around the neck and chest.',
-      'Support an injured arm or chest gently with folded clothing if this reduces movement and pain.',
-      'For an open chest wound, cover it loosely with a clean, non-airtight dressing.',
-      'Watch for increasing breathing difficulty, blue lips, coughing blood or reduced consciousness.',
-      'Be prepared to begin CPR if normal breathing stops.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Abdominal injury or internal bleeding',
-    subtitle: '6 steps',
-    icon: Icons.personal_injury,
-    color: Color(0xFF26A69A),
-    videoQuery: 'abdominal injury internal bleeding',
-    steps: [
-      'Keep the person lying still in the most comfortable position.',
-      'Support the knees slightly bent only when this is comfortable and no pelvic or spinal injury is suspected.',
-      'Loosen tight clothing around the abdomen.',
-      'Keep the person warm with a blanket.',
-      'Watch for abdominal swelling, increasing pain, pale clammy skin, weakness or confusion.',
-      'Give no food, drink or medication.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Open abdominal wound or protruding organs',
-    subtitle: '6 steps',
-    icon: Icons.healing,
-    color: Color(0xFFEF5350),
-    videoQuery: 'open abdominal wound dressing',
-    steps: [
-      'Do not press directly on the wound or organs.',
-      'Do not attempt to replace the organs inside the abdomen.',
-      'Cover them loosely with a clean dressing moistened with clean water or saline when available.',
-      'Keep the person lying still with the knees supported if comfortable.',
-      'Keep them warm and monitor breathing.',
-      'Give nothing by mouth.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Suspected pelvic injury',
-    subtitle: '6 steps',
-    icon: Icons.airline_seat_legroom_extra,
-    color: Color(0xFF5C6BC0),
-    videoQuery: 'pelvic injury first aid',
-    steps: [
-      'Keep the person lying flat and completely still.',
-      'Support both legs with folded blankets without changing their position.',
-      'Keep the legs together naturally, but do not bind the pelvis unless specifically trained.',
-      'Watch for pale skin, sweating, rapid breathing, weakness or reduced awareness.',
-      'Keep the person warm.',
-      'Do not press, rock or test the pelvis and do not let the person stand.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Broken bone or dislocation',
-    subtitle: '6 steps',
-    icon: Icons.straighten,
-    color: Color(0xFF29B6F6),
-    videoQuery: 'fracture splint first aid',
-    steps: [
-      'Keep the injured part in the position found.',
-      'Support it above and below the injury using folded clothing, blankets or padded splints.',
-      'Check circulation beyond the injury by observing skin colour, warmth and sensation.',
-      'Cover an open fracture with a clean dressing and control bleeding around the exposed bone.',
-      'Apply a wrapped cold pack around the area without pressing directly on the injury.',
-      'Do not straighten the limb, replace a joint or push exposed bone inside.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Crushing or trapped injury',
-    subtitle: '6 steps',
-    icon: Icons.compress,
-    color: Color(0xFF8D6E63),
-    videoQuery: 'crush injury trapped person',
-    steps: [
-      'Make sure the vehicle or object is stable before approaching.',
-      'Reassure the trapped person and ask them to remain still.',
-      'Control any bleeding that can be reached safely.',
-      'Support the head and neck when spinal injury is possible.',
-      'Keep the person warm and monitor their breathing.',
-      'Do not lift the vehicle, pull the person free or remove a heavy object unless there is an immediate threat such as fire.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Amputation',
-    subtitle: '6 steps',
-    icon: Icons.content_cut,
-    color: Color(0xFFE53935),
-    videoQuery: 'amputation first aid',
-    steps: [
-      'Control bleeding from the injured area with firm direct pressure.',
-      'Cover the wound with a clean dressing.',
-      'Wrap the separated body part in clean, slightly damp gauze or cloth.',
-      'Place it inside a sealed plastic bag.',
-      'Place that bag inside another container containing ice and water.',
-      'Do not wash, scrub, freeze or place the body part directly on ice.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Burn',
-    subtitle: '7 steps',
-    icon: Icons.local_fire_department,
-    color: Color(0xFFFF7043),
-    videoQuery: 'burn first aid cool running water',
-    steps: [
-      'Move the person away from the heat source only when it is safe.',
-      'Cool the burn under cool running water for at least 20 minutes.',
-      'Remove jewellery and loose clothing near the burn before swelling begins.',
-      'Leave anything stuck to the skin in place.',
-      'After cooling, cover the burn loosely with a clean, non-fluffy dressing.',
-      'Keep the rest of the person warm.',
-      'Do not use ice, toothpaste, butter, oil, creams or powders.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Smoke inhalation or airway burn',
-    subtitle: '6 steps',
-    icon: Icons.air,
-    color: Color(0xFF90A4AE),
-    videoQuery: 'smoke inhalation first aid',
-    steps: [
-      'Move the person into fresh air without entering a smoke-filled or burning vehicle.',
-      'Help them sit upright or remain in the position that makes breathing easiest.',
-      'Loosen tight clothing around the neck.',
-      'Watch for coughing, hoarseness, soot around the mouth, facial burns or increasing breathing difficulty.',
-      'Check breathing continuously.',
-      'Begin CPR if normal breathing stops.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Eye injury',
-    subtitle: '6 steps',
-    icon: Icons.remove_red_eye,
-    color: Color(0xFF42A5F5),
-    videoQuery: 'eye injury first aid',
-    steps: [
-      'Ask the person not to rub or move the injured eye.',
-      'Keep their head still.',
-      'Cover the eye loosely with a clean dressing without applying pressure.',
-      'If an object is embedded, place padding around it to prevent movement.',
-      'Covering both eyes may reduce eye movement, but reassure the person continuously.',
-      'Do not remove an embedded object or press on the eyeball.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Facial injury',
-    subtitle: '6 steps',
-    icon: Icons.face,
-    color: Color(0xFFAB47BC),
-    videoQuery: 'facial injury first aid',
-    steps: [
-      'Keep the airway clear of loose teeth, blood or vomit.',
-      'Allow blood to drain from the mouth rather than flow backwards into the throat.',
-      'Control external bleeding with gentle pressure, avoiding obvious fractures or embedded objects.',
-      'Support the head and neck.',
-      'Monitor breathing carefully because facial swelling may obstruct the airway.',
-      'Do not force a damaged jaw or facial bone back into position.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Seizure after the crash',
-    subtitle: '7 steps',
-    icon: Icons.electric_bolt,
-    color: Color(0xFFFFCA28),
-    videoQuery: 'seizure first aid',
-    steps: [
-      'Move dangerous objects away from the person.',
-      'Place folded clothing beneath their head.',
-      'Allow the seizure to continue without restraining their movements.',
-      'Do not place anything inside their mouth.',
-      'When the movements stop, check breathing and protect the airway.',
-      'Turn them onto their side when necessary, keeping the head and neck aligned.',
-      'Record approximately how long the seizure lasted.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Shock',
-    subtitle: '7 steps',
-    icon: Icons.warning_amber_rounded,
-    color: Color(0xFFFFA726),
-    videoQuery: 'treating shock first aid',
-    steps: [
-      'Treat the cause, particularly severe bleeding.',
-      'Lay the person down when their injuries and breathing allow.',
-      'Keep them still and warm with a coat or blanket.',
-      'Loosen tight clothing and reassure them.',
-      'Check breathing and responsiveness repeatedly.',
-      'Do not raise the legs when chest, spinal, pelvic or leg injuries are suspected.',
-      'Give no food, drink or medication.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Person inside a burning vehicle',
-    subtitle: '6 steps',
-    icon: Icons.car_crash,
-    color: Color(0xFFD84315),
-    videoQuery: 'vehicle fire rescue safety',
-    steps: [
-      'Do not enter flames or thick smoke.',
-      'Approach only when there is a safe escape route.',
-      'Remove the person only when they face immediate danger and this can be done without trapping yourself.',
-      'Move them far enough away from the vehicle to avoid fire, smoke and explosion hazards.',
-      'Check breathing and control severe bleeding.',
-      'Cool any burns once the person is in a safe location.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Vehicle in water',
-    subtitle: '6 steps',
-    icon: Icons.water,
-    color: Color(0xFF26C6DA),
-    videoQuery: 'vehicle in water rescue',
-    steps: [
-      'Do not enter deep, fast-moving or unsafe water unless trained and properly equipped.',
-      'Use a rope, pole or floating object from a safe position when possible.',
-      'Once the person is safely removed, check responsiveness and breathing.',
-      'Begin CPR immediately when they are not breathing normally.',
-      'Remove wet outer clothing when practical and cover them to prevent heat loss.',
-      'Keep them lying still because a spinal injury may also be present.',
-    ],
-  ),
-  _FirstAidTopic(
-    title: 'Priority order with several injured',
-    subtitle: 'Who to help first',
-    icon: Icons.format_list_numbered,
-    color: Color(0xFF66BB6A),
-    videoQuery: 'triage multiple casualties',
-    steps: [
-      'First: anyone who is not breathing normally.',
-      'Second: anyone with severe, uncontrolled bleeding.',
-      'Third: anyone whose airway is blocked or threatened.',
-      'Fourth: anyone who is unconscious but breathing.',
-      'Fifth: anyone showing signs of serious chest, abdominal, head, spinal or pelvic injury.',
-      'Sixth: people with fractures, burns and less severe wounds.',
-      'Never give an injured person food, water, alcohol or medication.',
-      'Do not remove motorcycle helmets routinely, pull casualties from vehicles unnecessarily, or allow apparently uninjured people to walk around after a serious collision.',
-    ],
-  ),
-];
-
 class SafetyHubScreen extends StatefulWidget {
   final void Function(Locale)? onLocaleChanged;
 
@@ -521,8 +153,10 @@ class SafetyHubScreen extends StatefulWidget {
 }
 
 class _SafetyHubScreenState extends State<SafetyHubScreen> {
-  static const _contactsKey = 'safety_hub_contacts_json';
-  static const _hospitalsKey = 'safety_hub_hospitals_json';
+  // The prefs keys live on the shared repository so the SOS/voice read paths
+  // and this write path can never drift apart.
+  static const _contactsKey = EmergencyContactsRepository.contactsKey;
+  static const _hospitalsKey = EmergencyContactsRepository.hospitalsKey;
 
   _SafetyHubStage _stage = _SafetyHubStage.home;
   String _selectedTip = 'Before Treating Any Injury';
@@ -577,7 +211,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
 
     final topicQuery = widget.initialFirstAidTopic?.trim().toLowerCase();
     if (section == 'firstAid' && topicQuery != null && topicQuery.isNotEmpty) {
-      for (final topic in _firstAidTopics) {
+      for (final topic in firstAidTopics) {
         if (_topicMatchesQuery(topic, topicQuery)) {
           _selectedTip = topic.title;
           _stage = _SafetyHubStage.firstAidDetails;
@@ -600,7 +234,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
 
   // Fuzzy match: full containment either way, or any meaningful word of the
   // query appearing in the topic title ("a broken bone" -> "Broken bone...").
-  bool _topicMatchesQuery(_FirstAidTopic topic, String query) {
+  bool _topicMatchesQuery(FirstAidTopic topic, String query) {
     final title = topic.title.toLowerCase();
     final subtitle = topic.subtitle.toLowerCase();
     if (title.contains(query) ||
@@ -1153,15 +787,15 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
     });
   }
 
-  _FirstAidTopic get _selectedTopic {
-    return _firstAidTopics.firstWhere(
+  FirstAidTopic get _selectedTopic {
+    return firstAidTopics.firstWhere(
       (topic) => topic.title == _selectedTip,
-      orElse: () => _firstAidTopics.first,
+      orElse: () => firstAidTopics.first,
     );
   }
 
   // Opens a YouTube search with tutorial videos for the topic.
-  Future<void> _openTopicVideo(_FirstAidTopic topic) async {
+  Future<void> _openTopicVideo(FirstAidTopic topic) async {
     UsageLogger.logAction('first_aid_video', data: {'topic': topic.title});
     final uri = Uri.https('www.youtube.com', '/results', {
       'search_query': 'first aid ${topic.videoQuery}',
@@ -1180,18 +814,18 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
     }
   }
 
-  int get _selectedTopicIndex => _firstAidTopics.indexOf(_selectedTopic);
+  int get _selectedTopicIndex => firstAidTopics.indexOf(_selectedTopic);
 
   void _openNextTip() {
-    final nextIndex = (_selectedTopicIndex + 1) % _firstAidTopics.length;
-    _openTip(_firstAidTopics[nextIndex].title);
+    final nextIndex = (_selectedTopicIndex + 1) % firstAidTopics.length;
+    _openTip(firstAidTopics[nextIndex].title);
   }
 
   void _openPreviousTip() {
     final previousIndex =
-        (_selectedTopicIndex - 1 + _firstAidTopics.length) %
-        _firstAidTopics.length;
-    _openTip(_firstAidTopics[previousIndex].title);
+        (_selectedTopicIndex - 1 + firstAidTopics.length) %
+        firstAidTopics.length;
+    _openTip(firstAidTopics[previousIndex].title);
   }
 
   // -------------------------------------------------------------------------
@@ -1310,10 +944,10 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
         _EmergencyNumberCard(
           icon: Icons.shield_outlined,
           label: 'Police',
-          number: '122',
+          number: EmergencyNumbers.police,
           onTap: () => _launchCall(
             label: 'Police',
-            number: '122',
+            number: EmergencyNumbers.police,
             historyType: 'emergency_call',
           ),
         ),
@@ -1321,10 +955,10 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
         _EmergencyNumberCard(
           icon: Icons.local_hospital_outlined,
           label: 'Ambulance',
-          number: '123',
+          number: EmergencyNumbers.ambulance,
           onTap: () => _launchCall(
             label: 'Ambulance',
-            number: '123',
+            number: EmergencyNumbers.ambulance,
             historyType: 'emergency_call',
           ),
         ),
@@ -1332,10 +966,10 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
         _EmergencyNumberCard(
           icon: Icons.local_fire_department,
           label: 'Fire',
-          number: '180',
+          number: EmergencyNumbers.fire,
           onTap: () => _launchCall(
             label: 'Fire',
-            number: '180',
+            number: EmergencyNumbers.fire,
             historyType: 'emergency_call',
           ),
         ),
@@ -1343,10 +977,10 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
         _EmergencyNumberCard(
           icon: Icons.traffic,
           label: 'Traffic Police',
-          number: '128',
+          number: EmergencyNumbers.traffic,
           onTap: () => _launchCall(
             label: 'Traffic Police',
-            number: '128',
+            number: EmergencyNumbers.traffic,
             historyType: 'emergency_call',
           ),
         ),
@@ -1653,15 +1287,15 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
         _FirstAidTopControls(
           title: 'First Aid Tips',
           onBack: _handleBack,
-          onNext: () => _openTip(_firstAidTopics.first.title),
+          onNext: () => _openTip(firstAidTopics.first.title),
         ),
         const SizedBox(height: 24),
-        for (var i = 0; i < _firstAidTopics.length; i++) ...[
+        for (var i = 0; i < firstAidTopics.length; i++) ...[
           _FirstAidTile(
-            topic: _firstAidTopics[i],
-            onTap: () => _openTip(_firstAidTopics[i].title),
+            topic: firstAidTopics[i],
+            onTap: () => _openTip(firstAidTopics[i].title),
           ),
-          if (i != _firstAidTopics.length - 1) const SizedBox(height: 12),
+          if (i != firstAidTopics.length - 1) const SizedBox(height: 12),
         ],
       ],
     );
@@ -2401,7 +2035,7 @@ class _FirstAidArrowButton extends StatelessWidget {
 }
 
 class _FirstAidTile extends StatelessWidget {
-  final _FirstAidTopic topic;
+  final FirstAidTopic topic;
   final VoidCallback onTap;
 
   const _FirstAidTile({required this.topic, required this.onTap});
@@ -2529,7 +2163,7 @@ class _WatchVideoButton extends StatelessWidget {
 
 // A big illustrated header for a first-aid topic.
 class _FirstAidHeroCard extends StatelessWidget {
-  final _FirstAidTopic topic;
+  final FirstAidTopic topic;
 
   const _FirstAidHeroCard({required this.topic});
 
