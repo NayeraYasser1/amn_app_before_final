@@ -122,16 +122,17 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                       )
                     : const Icon(Icons.lock_reset),
                 label: Text(_sending ? 'Sending…' : 'Send password reset email'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.red,
-                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  disabledBackgroundColor: Colors.white38,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),

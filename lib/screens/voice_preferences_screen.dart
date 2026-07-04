@@ -80,7 +80,7 @@ class _VoicePreferencesScreenState extends State<VoicePreferencesScreen> {
       body: SafeArea(
         child: _loading
             ? const Center(
-                child: CircularProgressIndicator(color: AppColors.red),
+                child: CircularProgressIndicator(color: Colors.white70),
               )
             : ListView(
                 padding: const EdgeInsets.all(20),
@@ -113,7 +113,9 @@ class _VoicePreferencesScreenState extends State<VoicePreferencesScreen> {
                           min: 0.30,
                           max: 0.70,
                           divisions: 8,
-                          activeColor: AppColors.red,
+                          activeColor: Colors.white,
+                          inactiveColor: Colors.white24,
+                          thumbColor: Colors.white,
                           label: _rateLabel,
                           onChanged: (v) => setState(() => _rate = v),
                           onChangeEnd: (_) => _save(),

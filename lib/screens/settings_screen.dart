@@ -60,7 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
@@ -93,8 +93,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(16),
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Row(
                   children: [
@@ -108,9 +109,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             horizontal: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black,
+                            color: AppColors.background,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey[800]!),
+                            border: Border.all(color: AppColors.border),
                           ),
                           child: Row(
                             children: [
@@ -294,12 +295,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 14,
-        color: Colors.grey[400],
-        fontWeight: FontWeight.normal,
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 2),
+      child: Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 12,
+          color: AppColors.muted,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.8,
+        ),
       ),
     );
   }
@@ -307,38 +312,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildSettingsContainer(List<String> items) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: List.generate(items.length, (index) {
           final isLast = index == items.length - 1;
+          final label = items[index];
+          // Red is reserved for destructive actions only.
+          final destructive = label == 'Clear App Cache';
+          final labelColor = destructive ? AppColors.red : Colors.white;
+          final iconColor = destructive ? AppColors.red : Colors.white70;
           return Column(
             children: [
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () => _onSettingsItemTap(items[index]),
+                  onTap: () => _onSettingsItemTap(label),
                   borderRadius: BorderRadius.vertical(
-                    top: index == 0 ? const Radius.circular(12) : Radius.zero,
-                    bottom: isLast ? const Radius.circular(12) : Radius.zero,
+                    top: index == 0 ? const Radius.circular(14) : Radius.zero,
+                    bottom: isLast ? const Radius.circular(14) : Radius.zero,
                   ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 16,
+                      vertical: 15,
                     ),
                     child: Row(
                       children: [
+                        Icon(_iconFor(label), color: iconColor, size: 21),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Text(
-                            items[index],
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.normal,
+                            label,
+                            style: TextStyle(
+                              color: labelColor,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          color: Colors.white.withValues(alpha: 0.3),
+                          size: 20,
                         ),
                       ],
                     ),
@@ -346,18 +364,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               if (!isLast)
-                Divider(
+                const Divider(
                   height: 1,
                   thickness: 1,
-                  color: Colors.grey[800],
-                  indent: 16,
-                  endIndent: 16,
+                  color: AppColors.border,
+                  indent: 52,
+                  endIndent: 12,
                 ),
             ],
           );
         }),
       ),
     );
+  }
+
+  IconData _iconFor(String label) {
+    switch (label) {
+      case 'Edit Profile':
+        return Icons.person_outline;
+      case 'Driver License':
+        return Icons.badge_outlined;
+      case 'Privacy':
+        return Icons.privacy_tip_outlined;
+      case 'Vehicle Model & Info':
+        return Icons.directions_car_outlined;
+      case 'Maintenance Reminders':
+        return Icons.build_outlined;
+      case 'Link/Unlink Vehicle':
+        return Icons.link;
+      case 'Security Options':
+        return Icons.lock_outline;
+      case 'Language Selection':
+        return Icons.record_voice_over_outlined;
+      case 'Voice Type':
+        return Icons.graphic_eq;
+      case 'Voice Command Sensitivity':
+        return Icons.tune;
+      case 'Theme':
+        return Icons.dark_mode_outlined;
+      case 'Notifications':
+        return Icons.notifications_outlined;
+      case 'Language':
+        return Icons.language;
+      case 'Clear App Cache':
+        return Icons.cleaning_services_outlined;
+      case 'Android Call Bridge':
+        return Icons.settings_remote_outlined;
+      case 'FAQs':
+        return Icons.help_outline;
+      case 'Report a Problem':
+        return Icons.bug_report_outlined;
+      case 'User Guide':
+        return Icons.menu_book_outlined;
+      case 'Contact Us':
+        return Icons.mail_outline;
+      case 'Terms & Privacy Policy':
+        return Icons.description_outlined;
+      case 'Version Info':
+        return Icons.info_outline;
+      default:
+        return Icons.settings_outlined;
+    }
   }
 
   void _push(Widget screen) {

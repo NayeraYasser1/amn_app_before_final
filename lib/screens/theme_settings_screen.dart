@@ -67,7 +67,7 @@ class ThemeSettingsScreen extends StatelessWidget {
         color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: selected ? AppColors.red : AppColors.border,
+          color: selected ? Colors.white : AppColors.border,
           width: selected ? 1.5 : 1,
         ),
       ),
@@ -79,7 +79,7 @@ class ThemeSettingsScreen extends StatelessWidget {
           style: const TextStyle(color: AppColors.muted, fontSize: 12),
         ),
         trailing: selected
-            ? const Icon(Icons.check_circle, color: AppColors.red)
+            ? const Icon(Icons.check_circle, color: Colors.white)
             : null,
       ),
     );

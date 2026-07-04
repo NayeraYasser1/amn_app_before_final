@@ -66,7 +66,7 @@ class _NotificationSettingsScreenState
       body: SafeArea(
         child: _loading
             ? const Center(
-                child: CircularProgressIndicator(color: AppColors.red),
+                child: CircularProgressIndicator(color: Colors.white70),
               )
             : ListView(
                 padding: const EdgeInsets.all(16),
@@ -129,7 +129,10 @@ class _NotificationSettingsScreenState
       child: SwitchListTile(
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.red,
+        activeColor: Colors.white,
+        activeTrackColor: Colors.white38,
+        inactiveThumbColor: Colors.grey,
+        inactiveTrackColor: Colors.white10,
         title: Text(
           title,
           style: const TextStyle(color: Colors.white, fontSize: 15),
