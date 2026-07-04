@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'emergency_history_screen.dart';
 import '../services/emergency_history_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/snackbar.dart';
 import 'settings_screen.dart';
 import 'voice_assistant_screen.dart';
 
@@ -390,11 +391,7 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
     );
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
+  void _showMessage(String message) => showAppSnack(context, message);
 
   Future<void> _launchExternal(Uri uri) async {
     try {

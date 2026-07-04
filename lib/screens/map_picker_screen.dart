@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../theme/app_colors.dart';
+import '../utils/snackbar.dart';
 
 const Color _bg = AppColors.background;
 const Color _card = AppColors.card;
@@ -95,9 +96,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showAppSnack(context, message);
   }
 
   // Search for places and show a tappable results list (biased to the

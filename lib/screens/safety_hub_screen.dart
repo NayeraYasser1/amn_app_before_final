@@ -7,12 +7,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/first_aid_content.dart';
+import '../models/emergency_contact.dart';
+import '../models/hospital.dart';
 import '../services/emergency_contacts_repository.dart';
 import '../services/emergency_history_service.dart';
 import '../services/usage_logger.dart';
 import '../theme/app_colors.dart';
 import '../utils/emergency_numbers.dart';
 import '../utils/phone.dart';
+import '../utils/snackbar.dart';
 import 'emergency_history_screen.dart';
 import 'map_picker_screen.dart';
 import 'settings_screen.dart';
@@ -41,96 +44,6 @@ enum _SafetyHubStage {
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
-
-class _EmergencyContact {
-  final String name;
-  final String phone;
-  final String relationship;
-
-  /// The default contact is the one the SOS button sends the emergency SMS
-  /// to. Exactly one contact is default at any time.
-  final bool isDefault;
-
-  const _EmergencyContact({
-    required this.name,
-    required this.phone,
-    required this.relationship,
-    this.isDefault = false,
-  });
-
-  _EmergencyContact copyWith({bool? isDefault}) => _EmergencyContact(
-    name: name,
-    phone: phone,
-    relationship: relationship,
-    isDefault: isDefault ?? this.isDefault,
-  );
-
-  Map<String, dynamic> toMap() => {
-    'name': name,
-    'phone': phone,
-    'relationship': relationship,
-    'default': isDefault,
-  };
-
-  factory _EmergencyContact.fromMap(Map<String, dynamic> map) {
-    return _EmergencyContact(
-      name: (map['name'] ?? '').toString(),
-      phone: (map['phone'] ?? '').toString(),
-      relationship: (map['relationship'] ?? '').toString(),
-      isDefault: map['default'] == true,
-    );
-  }
-}
-
-class _Hospital {
-  final String name;
-  final String phone;
-  final String address;
-  final double? latitude;
-  final double? longitude;
-
-  /// The default hospital is the one the SOS button sends the emergency SMS
-  /// to. Exactly one hospital is default at any time.
-  final bool isDefault;
-
-  const _Hospital({
-    required this.name,
-    required this.phone,
-    required this.address,
-    this.latitude,
-    this.longitude,
-    this.isDefault = false,
-  });
-
-  _Hospital copyWith({bool? isDefault}) => _Hospital(
-    name: name,
-    phone: phone,
-    address: address,
-    latitude: latitude,
-    longitude: longitude,
-    isDefault: isDefault ?? this.isDefault,
-  );
-
-  Map<String, dynamic> toMap() => {
-    'name': name,
-    'phone': phone,
-    'address': address,
-    'latitude': latitude,
-    'longitude': longitude,
-    'default': isDefault,
-  };
-
-  factory _Hospital.fromMap(Map<String, dynamic> map) {
-    return _Hospital(
-      name: (map['name'] ?? '').toString(),
-      phone: (map['phone'] ?? '').toString(),
-      address: (map['address'] ?? '').toString(),
-      latitude: (map['latitude'] as num?)?.toDouble(),
-      longitude: (map['longitude'] as num?)?.toDouble(),
-      isDefault: map['default'] == true,
-    );
-  }
-}
 
 class SafetyHubScreen extends StatefulWidget {
   final void Function(Locale)? onLocaleChanged;
@@ -161,8 +74,8 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
   _SafetyHubStage _stage = _SafetyHubStage.home;
   String _selectedTip = 'Before Treating Any Injury';
 
-  List<_EmergencyContact> _contacts = [];
-  List<_Hospital> _hospitals = [];
+  List<EmergencyContact> _contacts = [];
+  List<Hospital> _hospitals = [];
   String _contactSearch = '';
 
   // Contact form state (used for both add and edit).
@@ -255,40 +168,40 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    List<_EmergencyContact> contacts;
+    List<EmergencyContact> contacts;
     final rawContacts = prefs.getString(_contactsKey);
     if (rawContacts == null || rawContacts.isEmpty) {
       // Start empty. We must NOT seed placeholder people here: those seeds get
       // persisted as real contacts and the SOS flow would then silently text a
       // made-up number that may belong to a real stranger. The user adds their
       // own contacts. (Growable list so add/edit/delete work.)
-      contacts = <_EmergencyContact>[];
+      contacts = <EmergencyContact>[];
     } else {
       contacts = _decodeList(rawContacts)
-          .map(_EmergencyContact.fromMap)
+          .map(EmergencyContact.fromMap)
           .toList();
     }
 
-    List<_Hospital> hospitals;
+    List<Hospital> hospitals;
     final rawHospitals = prefs.getString(_hospitalsKey);
     if (rawHospitals == null || rawHospitals.isEmpty) {
       // NOTE: must be a growable list (not const) so add/edit/delete work.
       hospitals = [
-        const _Hospital(
+        const Hospital(
           name: 'El Salam Hospital',
           phone: '19885',
           address: 'Corniche El Nile, Maadi, Cairo',
           latitude: 29.9603,
           longitude: 31.2632,
         ),
-        const _Hospital(
+        const Hospital(
           name: 'Cleopatra Hospital',
           phone: '16805',
           address: '39 Cleopatra St., Heliopolis, Cairo',
           latitude: 30.0872,
           longitude: 31.3243,
         ),
-        const _Hospital(
+        const Hospital(
           name: 'Dar Al Fouad Hospital',
           phone: '16780',
           address: 'Yousef Abbas St., Nasr City, Cairo',
@@ -297,7 +210,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
         ),
       ];
     } else {
-      hospitals = _decodeList(rawHospitals).map(_Hospital.fromMap).toList();
+      hospitals = _decodeList(rawHospitals).map(Hospital.fromMap).toList();
     }
 
     if (!mounted) return;
@@ -312,29 +225,13 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
     await _saveHospitals();
   }
 
-  /// Keeps the invariant of exactly one default contact (the SOS target):
-  /// the first flagged one wins; if none is flagged, the first contact is.
-  void _ensureSingleDefaultContact() {
-    if (_contacts.isEmpty) return;
-    var idx = _contacts.indexWhere((c) => c.isDefault);
-    if (idx < 0) idx = 0;
-    for (var i = 0; i < _contacts.length; i++) {
-      if (_contacts[i].isDefault != (i == idx)) {
-        _contacts[i] = _contacts[i].copyWith(isDefault: i == idx);
-      }
-    }
-  }
+  /// Keeps the invariant of exactly one default contact/hospital (the SOS
+  /// target). The logic now lives on the model so it can be unit-tested.
+  void _ensureSingleDefaultContact() =>
+      EmergencyContact.ensureSingleDefault(_contacts);
 
-  void _ensureSingleDefaultHospital() {
-    if (_hospitals.isEmpty) return;
-    var idx = _hospitals.indexWhere((h) => h.isDefault);
-    if (idx < 0) idx = 0;
-    for (var i = 0; i < _hospitals.length; i++) {
-      if (_hospitals[i].isDefault != (i == idx)) {
-        _hospitals[i] = _hospitals[i].copyWith(isDefault: i == idx);
-      }
-    }
-  }
+  void _ensureSingleDefaultHospital() =>
+      Hospital.ensureSingleDefault(_hospitals);
 
   List<Map<String, dynamic>> _decodeList(String raw) {
     try {
@@ -424,11 +321,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
   // Calls & directions
   // -------------------------------------------------------------------------
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
+  void _showMessage(String message) => showAppSnack(context, message);
 
   // Opens the phone dialer with the number ready to call.
   Future<void> _launchCall({
@@ -462,7 +355,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
   }
 
   // Opens real Google Maps driving directions to the hospital.
-  Future<void> _openHospitalDirections(_Hospital hospital) async {
+  Future<void> _openHospitalDirections(Hospital hospital) async {
     UsageLogger.logAction(
       'safety_hub_hospital_directions',
       data: {'name': hospital.name},
@@ -528,7 +421,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
     }
     _committingForm = true;
 
-    final contact = _EmergencyContact(
+    final contact = EmergencyContact(
       name: name,
       phone: phone,
       relationship: relationship.isEmpty ? 'Contact' : relationship,
@@ -668,7 +561,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
     }
     _committingForm = true;
 
-    final hospital = _Hospital(
+    final hospital = Hospital(
       name: name,
       phone: phone,
       address: address,
@@ -1592,7 +1485,7 @@ class _DefaultBadge extends StatelessWidget {
 }
 
 class _ContactCard extends StatelessWidget {
-  final _EmergencyContact contact;
+  final EmergencyContact contact;
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -1745,7 +1638,7 @@ class _ContactCard extends StatelessWidget {
 }
 
 class _HospitalCard extends StatelessWidget {
-  final _Hospital hospital;
+  final Hospital hospital;
   final VoidCallback onCall;
   final VoidCallback onDirections;
   final VoidCallback onEdit;
