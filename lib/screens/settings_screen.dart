@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'language_country_screen.dart';
 import 'edit_profile_screen.dart';
 import 'car_information_screen.dart';
@@ -7,10 +8,17 @@ import 'driver_license_screen.dart';
 import 'android_call_bridge_status_screen.dart';
 import 'emergency_history_screen.dart';
 import 'home_page.dart';
+import 'info_page_screen.dart';
+import 'notification_settings_screen.dart';
+import 'pairing_unpaired_screen.dart';
+import 'security_settings_screen.dart';
+import 'theme_settings_screen.dart';
 import 'voice_assistant_screen.dart';
+import 'voice_preferences_screen.dart';
 import '../services/preferences_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/locale_helper.dart';
+import '../utils/snackbar.dart';
 
 // Match the app-wide bottom navigation style used on Home/Assistant/History.
 const Color _navBg = AppColors.background;
@@ -92,32 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Expanded(
                       child: InkWell(
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => LanguageCountryScreen(
-                                initialLanguage: _selectedLanguage,
-                                initialCountry: _selectedCountry,
-                              ),
-                            ),
-                          );
-                          if (!mounted) return;
-                          if (result is Map) {
-                            setState(() {
-                              _selectedLanguage =
-                                  result['language'] ?? _selectedLanguage;
-                              _selectedCountry =
-                                  result['country'] ?? _selectedCountry;
-                            });
-                            if (widget.onLocaleChanged != null) {
-                              final locale = localeFromLanguage(
-                                _selectedLanguage,
-                              );
-                              widget.onLocaleChanged!(locale);
-                            }
-                          }
-                        },
+                        onTap: _openLanguageCountry,
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -377,43 +360,293 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _onSettingsItemTap(String label) {
-    if (label == 'Edit Profile') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-      );
-    } else if (label == 'Driver License') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const DriverLicenseScreen()),
-      );
-    } else if (label == 'Vehicle Model & Info') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const CarInformationScreen()),
-      );
-    } else if (label == 'Maintenance Reminders') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const MaintenanceRemindersScreen()),
-      );
-    } else if (label == 'Android Call Bridge') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const AndroidCallBridgeStatusScreen(),
+  void _push(Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
+  Future<void> _openLanguageCountry() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LanguageCountryScreen(
+          initialLanguage: _selectedLanguage,
+          initialCountry: _selectedCountry,
         ),
-      );
-    } else {
-      // Unimplemented settings row — give the user feedback instead of a
-      // dead tap. These get wired up as the features land.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('"$label" is coming soon.'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      ),
+    );
+    if (!mounted) return;
+    if (result is Map) {
+      setState(() {
+        _selectedLanguage = result['language'] ?? _selectedLanguage;
+        _selectedCountry = result['country'] ?? _selectedCountry;
+      });
+      if (widget.onLocaleChanged != null) {
+        widget.onLocaleChanged!(localeFromLanguage(_selectedLanguage));
+      }
     }
   }
+
+  Future<void> _sendEmail(String subject) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'support@amnapp.example',
+      queryParameters: {'subject': subject},
+    );
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        showAppSnack(context, 'No email app found. Reach us at support@amnapp.example');
+      }
+    } catch (_) {
+      if (mounted) {
+        showAppSnack(context, 'No email app found. Reach us at support@amnapp.example');
+      }
+    }
+  }
+
+  Future<void> _clearCache() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.card,
+        title: const Text(
+          'Clear app cache?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'This frees cached images and temporary data. Your account, '
+          'contacts and saved data are not affected.',
+          style: TextStyle(color: AppColors.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear', style: TextStyle(color: AppColors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    if (!mounted) return;
+    showAppSnack(context, 'App cache cleared.');
+  }
+
+  void _onSettingsItemTap(String label) {
+    switch (label) {
+      // Existing feature screens.
+      case 'Edit Profile':
+        _push(const EditProfileScreen());
+        break;
+      case 'Driver License':
+        _push(const DriverLicenseScreen());
+        break;
+      case 'Vehicle Model & Info':
+        _push(const CarInformationScreen());
+        break;
+      case 'Maintenance Reminders':
+        _push(const MaintenanceRemindersScreen());
+        break;
+      case 'Android Call Bridge':
+        _push(const AndroidCallBridgeStatusScreen());
+        break;
+      // Reused existing screens.
+      case 'Link/Unlink Vehicle':
+        _push(const PairingUnpairedScreen());
+        break;
+      case 'Language':
+      case 'Language Selection':
+        _openLanguageCountry();
+        break;
+      // New preference screens.
+      case 'Security Options':
+        _push(const SecuritySettingsScreen());
+        break;
+      case 'Notifications':
+        _push(const NotificationSettingsScreen());
+        break;
+      case 'Theme':
+        _push(const ThemeSettingsScreen());
+        break;
+      case 'Voice Type':
+      case 'Voice Command Sensitivity':
+        _push(const VoicePreferencesScreen());
+        break;
+      case 'Clear App Cache':
+        _clearCache();
+        break;
+      // Information screens.
+      case 'FAQs':
+        _push(_faqPage());
+        break;
+      case 'User Guide':
+        _push(_userGuidePage());
+        break;
+      case 'Contact Us':
+        _push(_contactPage());
+        break;
+      case 'Report a Problem':
+        _push(_reportPage());
+        break;
+      case 'Privacy':
+      case 'Terms & Privacy Policy':
+        _push(_legalPage());
+        break;
+      case 'Version Info':
+        _push(_aboutPage());
+        break;
+    }
+  }
+
+  Widget _faqPage() => const InfoPageScreen(
+    title: 'FAQs',
+    sections: [
+      InfoSection(
+        'Hold the SOS button for 3 seconds. AMN opens the dialer with the '
+        'ambulance number (123) and sends an SOS SMS with your location to '
+        'your default emergency contact.',
+        heading: 'How does the SOS button work?',
+      ),
+      InfoSection(
+        'Open Safety Hub then Emergency Contacts, add a contact, and set one '
+        'as the default from the 3-dots menu. The default contact receives '
+        'the SOS SMS.',
+        heading: 'How do I set my emergency contact?',
+      ),
+      InfoSection(
+        'Tap Parking then Save to remember where you parked, then Find my car '
+        'for walking directions back to it.',
+        heading: 'How does Find my car work?',
+      ),
+      InfoSection(
+        'No. AMN uses free, keyless maps (OpenStreetMap), so no paid maps key '
+        'is needed. An internet connection is required for maps, weather and '
+        'search.',
+        heading: 'Do I need to pay for maps?',
+      ),
+      InfoSection(
+        'Tap the microphone and speak, or tap a suggested command button. If '
+        'speaking does not work, your device text-to-speech may need to be '
+        'set up in the system settings.',
+        heading: 'The voice assistant will not talk?',
+      ),
+    ],
+  );
+
+  Widget _userGuidePage() => const InfoPageScreen(
+    title: 'User Guide',
+    sections: [
+      InfoSection(
+        'AMN is your driving-safety companion: one tap for help, your '
+        'emergency info in one place, and a hands-free voice assistant.',
+        heading: 'Welcome',
+      ),
+      InfoSection(
+        'The big red SOS button calls the ambulance and alerts your default '
+        'contact. Below it are quick actions, live navigation and weather.',
+        heading: 'Home and SOS',
+      ),
+      InfoSection(
+        'Safety Hub holds the Egypt emergency numbers, your contacts, '
+        'hospitals and a 23-topic first-aid guide for road injuries.',
+        heading: 'Safety Hub',
+      ),
+      InfoSection(
+        'Save your parking spot with one tap and get walking directions back '
+        'to your car later.',
+        heading: 'Parking',
+      ),
+      InfoSection(
+        'Tap the microphone and speak a command such as "call police" or '
+        '"where am I", or tap a suggestion chip.',
+        heading: 'Voice Assistant',
+      ),
+    ],
+  );
+
+  Widget _legalPage() => const InfoPageScreen(
+    title: 'Terms & Privacy',
+    sections: [
+      InfoSection(
+        'AMN is provided as an assistance tool for drivers. It is not a '
+        'replacement for contacting the official emergency services directly.',
+        heading: 'Terms of Use',
+      ),
+      InfoSection(
+        'AMN stores your profile, emergency contacts and history to provide '
+        'its features. Your location is used only to power SOS, parking and '
+        'navigation, and is shared only when you send an SOS or choose to '
+        'share your location.',
+        heading: 'Privacy',
+      ),
+      InfoSection(
+        'AMN is a graduation project. Always confirm a real emergency by '
+        'calling the official services yourself.',
+        heading: 'Disclaimer',
+      ),
+    ],
+  );
+
+  Widget _aboutPage() => const InfoPageScreen(
+    title: 'About',
+    sections: [
+      InfoSection('AMN', heading: 'App'),
+      InfoSection('Version 1.0.0 (build 1)'),
+      InfoSection(
+        'A keyless driving-safety assistant: SOS, emergency contacts, '
+        'hospitals, first aid, parking, navigation, weather and a voice '
+        'assistant.',
+        heading: 'About',
+      ),
+    ],
+  );
+
+  Widget _contactPage() => InfoPageScreen(
+    title: 'Contact Us',
+    sections: const [
+      InfoSection(
+        'We would love to hear from you. Email the AMN team and we will get '
+        'back to you.',
+        heading: 'Get in touch',
+      ),
+      InfoSection('support@amnapp.example'),
+    ],
+    actions: [
+      InfoAction(
+        label: 'Send us an email',
+        icon: Icons.email_outlined,
+        onTap: () {
+          _sendEmail('AMN app - question');
+        },
+      ),
+    ],
+  );
+
+  Widget _reportPage() => InfoPageScreen(
+    title: 'Report a Problem',
+    sections: const [
+      InfoSection(
+        'Found a bug or something not working? Tell us what happened and we '
+        'will look into it.',
+        heading: 'Report a Problem',
+      ),
+      InfoSection(
+        'Please include what you were doing when the problem happened.',
+      ),
+    ],
+    actions: [
+      InfoAction(
+        label: 'Email a report',
+        icon: Icons.bug_report_outlined,
+        onTap: () {
+          _sendEmail('AMN app - problem report');
+        },
+      ),
+    ],
+  );
 }

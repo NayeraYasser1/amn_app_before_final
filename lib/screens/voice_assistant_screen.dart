@@ -185,7 +185,13 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
           }
         }
       } catch (_) {}
-      await _tts.setSpeechRate(0.48).timeout(limit);
+      // Use the user's saved speaking speed (Settings -> Voice Preferences),
+      // defaulting to a natural pace. Key matches VoicePreferencesScreen.rateKey.
+      final rate =
+          (await SharedPreferences.getInstance())
+              .getDouble('voice_speech_rate') ??
+          0.48;
+      await _tts.setSpeechRate(rate).timeout(limit);
       await _tts.setPitch(1.0).timeout(limit);
       await _tts.setVolume(1.0).timeout(limit);
       _ttsAvailable = true;
