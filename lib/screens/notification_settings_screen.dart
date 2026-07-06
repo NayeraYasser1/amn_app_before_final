@@ -9,7 +9,7 @@ class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
 
   @override
-  State<NotificationSettingsScreen> createState() =>
+  State<NotificationSettingsScreen> get createState =>
       _NotificationSettingsScreenState();
 }
 
@@ -129,7 +129,7 @@ class _NotificationSettingsScreenState
       child: SwitchListTile(
         value: value,
         onChanged: onChanged,
-        activeColor: Colors.white,
+        activeThumbColor: Colors.white,
         activeTrackColor: Colors.white38,
         inactiveThumbColor: Colors.grey,
         inactiveTrackColor: Colors.white10,

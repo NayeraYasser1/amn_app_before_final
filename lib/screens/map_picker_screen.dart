@@ -16,7 +16,8 @@ const Color _border = AppColors.border;
 const Color _red = AppColors.red;
 const Color _muted = AppColors.muted;
 
-const String _osmTileTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const String _osmTileTemplate =
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 // The destination the user confirmed on the map.
 class PickedDestination {
@@ -60,7 +61,7 @@ class MapPickerScreen extends StatefulWidget {
   });
 
   @override
-  State<MapPickerScreen> createState() => _MapPickerScreenState();
+  State<MapPickerScreen> get createState => _MapPickerScreenState();
 }
 
 class _MapPickerScreenState extends State<MapPickerScreen> {
@@ -171,10 +172,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   // Move the map to a chosen search result.
   void _goToSuggestion(_Suggestion suggestion) {
     FocusScope.of(context).unfocus();
-    _mapController.move(
-      LatLng(suggestion.latitude, suggestion.longitude),
-      16,
-    );
+    _mapController.move(LatLng(suggestion.latitude, suggestion.longitude), 16);
     setState(() {
       _suggestions = [];
       _searchController.text = suggestion.name;
@@ -206,10 +204,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   void _recenter() {
-    _mapController.move(
-      LatLng(widget.initialLat, widget.initialLng),
-      15,
-    );
+    _mapController.move(LatLng(widget.initialLat, widget.initialLng), 15);
   }
 
   void _zoomIn() {

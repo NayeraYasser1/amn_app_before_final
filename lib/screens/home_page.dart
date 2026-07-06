@@ -39,8 +39,18 @@ const int _sosHoldSeconds = 3;
 // if it were live status.
 String _homeDateLabel() {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   final now = DateTime.now();
@@ -57,7 +67,7 @@ class HomePage extends StatefulWidget {
   const HomePage({super.key, this.onLocaleChanged});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<HomePage> get createState => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
@@ -911,7 +921,7 @@ class _SosButton extends StatefulWidget {
   });
 
   @override
-  State<_SosButton> createState() => _SosButtonState();
+  State<_SosButton> get createState => _SosButtonState();
 }
 
 class _SosButtonState extends State<_SosButton>

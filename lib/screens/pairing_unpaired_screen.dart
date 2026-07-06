@@ -29,7 +29,7 @@ class PairingUnpairedScreen extends StatefulWidget {
   const PairingUnpairedScreen({super.key});
 
   @override
-  State<PairingUnpairedScreen> createState() => _PairingUnpairedScreenState();
+  State<PairingUnpairedScreen> get createState => _PairingUnpairedScreenState();
 }
 
 class _PairingUnpairedScreenState extends State<PairingUnpairedScreen>

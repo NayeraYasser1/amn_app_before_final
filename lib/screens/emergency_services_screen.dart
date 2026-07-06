@@ -49,7 +49,7 @@ class EmergencyServicesScreen extends StatefulWidget {
   });
 
   @override
-  State<EmergencyServicesScreen> createState() =>
+  State<EmergencyServicesScreen> get createState =>
       _EmergencyServicesScreenState();
 }
 
@@ -251,9 +251,7 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final name = data['display_name']?.toString();
         if (name != null && name.isNotEmpty && mounted) {
-          setState(
-            () => _address = name.split(',').take(4).join(',').trim(),
-          );
+          setState(() => _address = name.split(',').take(4).join(',').trim());
         }
       } catch (_) {}
     } catch (_) {
@@ -400,9 +398,9 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
     if (link == null) return;
     await Clipboard.setData(ClipboardData(text: link));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Location link copied.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Location link copied.')));
   }
 
   Future<void> _openNearbyHospitals() async {
@@ -469,11 +467,12 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
         type: 'sos',
         title: 'SOS Ended - Marked Safe',
         description: 'User marked themselves safe after $_elapsedText',
-        location: _address ??
+        location:
+            _address ??
             (_position == null
                 ? null
                 : '${_position!.latitude.toStringAsFixed(6)}, '
-                    '${_position!.longitude.toStringAsFixed(6)}'),
+                      '${_position!.longitude.toStringAsFixed(6)}'),
         status: 'Resolved',
       ).catchError((_) {}),
     );
@@ -642,9 +641,7 @@ class _EmergencyServicesScreenState extends State<EmergencyServicesScreen> {
           onHistory: () {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const EmergencyHistoryScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const EmergencyHistoryScreen()),
             );
           },
           onHome: () =>
@@ -849,7 +846,8 @@ class _ActiveStage extends StatelessWidget {
             children: [
               _StatusRow(
                 done: dialStarted,
-                doneText: 'Dialer opened with $_ambulanceNumber — press the '
+                doneText:
+                    'Dialer opened with $_ambulanceNumber — press the '
                     'green button if you have not called yet',
                 pendingText: 'Opening the dialer with $_ambulanceNumber…',
               ),
@@ -1027,71 +1025,73 @@ class _ActiveStage extends StatelessWidget {
                   ),
                 ),
               ] else
-                ...contacts.take(4).map(
-                  (contact) => Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: Row(
-                      children: [
-                        const CircleAvatar(
-                          radius: 17,
-                          backgroundColor: Color(0xFF2A3137),
-                          child: Icon(
-                            Icons.person,
-                            color: Colors.white,
-                            size: 19,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                [
-                                  (contact['name'] ?? '').toString(),
-                                  if ((contact['relationship'] ?? '')
-                                      .toString()
-                                      .isNotEmpty)
-                                    '(${contact['relationship']})',
-                                ].join(' '),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                ...contacts
+                    .take(4)
+                    .map(
+                      (contact) => Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Row(
+                          children: [
+                            const CircleAvatar(
+                              radius: 17,
+                              backgroundColor: Color(0xFF2A3137),
+                              child: Icon(
+                                Icons.person,
+                                color: Colors.white,
+                                size: 19,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                (contact['phone'] ?? '').toString(),
-                                style: const TextStyle(
-                                  color: _muted,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => onCallContact(
-                            (contact['phone'] ?? '').toString(),
-                          ),
-                          icon: const CircleAvatar(
-                            radius: 17,
-                            backgroundColor: _green,
-                            child: Icon(
-                              Icons.call,
-                              color: Colors.white,
-                              size: 17,
                             ),
-                          ),
-                          tooltip: 'Call',
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    [
+                                      (contact['name'] ?? '').toString(),
+                                      if ((contact['relationship'] ?? '')
+                                          .toString()
+                                          .isNotEmpty)
+                                        '(${contact['relationship']})',
+                                    ].join(' '),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    (contact['phone'] ?? '').toString(),
+                                    style: const TextStyle(
+                                      color: _muted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => onCallContact(
+                                (contact['phone'] ?? '').toString(),
+                              ),
+                              icon: const CircleAvatar(
+                                radius: 17,
+                                backgroundColor: _green,
+                                child: Icon(
+                                  Icons.call,
+                                  color: Colors.white,
+                                  size: 17,
+                                ),
+                              ),
+                              tooltip: 'Call',
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
             ],
           ),
         ),
@@ -1208,7 +1208,11 @@ class _StatusRow extends StatelessWidget {
         else if (done)
           const Icon(Icons.check_circle, color: _green, size: 18)
         else
-          const Icon(Icons.radio_button_checked, color: Colors.white70, size: 17),
+          const Icon(
+            Icons.radio_button_checked,
+            color: Colors.white70,
+            size: 17,
+          ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -1498,7 +1502,11 @@ class _SecondaryButton extends StatelessWidget {
   final IconData? icon;
   final VoidCallback? onPressed;
 
-  const _SecondaryButton({required this.text, required this.onPressed, this.icon});
+  const _SecondaryButton({
+    required this.text,
+    required this.onPressed,
+    this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {

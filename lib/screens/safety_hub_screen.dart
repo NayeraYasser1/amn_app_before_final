@@ -62,7 +62,7 @@ class SafetyHubScreen extends StatefulWidget {
   });
 
   @override
-  State<SafetyHubScreen> createState() => _SafetyHubScreenState();
+  State<SafetyHubScreen> get createState => _SafetyHubScreenState();
 }
 
 class _SafetyHubScreenState extends State<SafetyHubScreen> {
@@ -177,9 +177,9 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       // own contacts. (Growable list so add/edit/delete work.)
       contacts = <EmergencyContact>[];
     } else {
-      contacts = _decodeList(rawContacts)
-          .map(EmergencyContact.fromMap)
-          .toList();
+      contacts = _decodeList(
+        rawContacts,
+      ).map(EmergencyContact.fromMap).toList();
     }
 
     List<Hospital> hospitals;
@@ -361,8 +361,8 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
       data: {'name': hospital.name},
     );
 
-    final destination = (hospital.latitude != null &&
-            hospital.longitude != null)
+    final destination =
+        (hospital.latitude != null && hospital.longitude != null)
         ? '${hospital.latitude},${hospital.longitude}'
         : '${hospital.name} ${hospital.address}'.trim();
 
@@ -608,9 +608,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
     });
     await _saveHospitals();
     if (!mounted) return;
-    _showMessage(
-      '${_hospitals[index].name} is now the SOS default hospital.',
-    );
+    _showMessage('${_hospitals[index].name} is now the SOS default hospital.');
   }
 
   Future<void> _deleteHospital(int index) async {
@@ -646,8 +644,9 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 16),
           ),
           content: Text(
-            message ?? 'It will be removed from your list. '
-                'You can add it again anytime.',
+            message ??
+                'It will be removed from your list. '
+                    'You can add it again anytime.',
             style: const TextStyle(color: _muted, fontSize: 13, height: 1.35),
           ),
           actions: [
@@ -999,8 +998,7 @@ class _SafetyHubScreenState extends State<SafetyHubScreen> {
             ])
               _RelationChip(
                 label: label,
-                onTap: () =>
-                    setState(() => _contactRelationCtrl.text = label),
+                onTap: () => setState(() => _contactRelationCtrl.text = label),
               ),
           ],
         ),
@@ -1451,7 +1449,7 @@ class _DefaultSosSwitch extends StatelessWidget {
               ],
             ),
           ),
-          Switch(value: value, activeColor: _red, onChanged: onChanged),
+          Switch(value: value, activeThumbColor: _red, onChanged: onChanged),
         ],
       ),
     );
@@ -1527,7 +1525,11 @@ class _ContactCard extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.18),
                     ),
                   ),
-                  child: const Icon(Icons.person, color: Colors.white, size: 24),
+                  child: const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 11),
                 Expanded(
@@ -1600,8 +1602,10 @@ class _ContactCard extends StatelessWidget {
                           children: [
                             Icon(Icons.sos, color: _red, size: 17),
                             SizedBox(width: 9),
-                            Text('Set as default',
-                                style: TextStyle(color: Colors.white)),
+                            Text(
+                              'Set as default',
+                              style: TextStyle(color: Colors.white),
+                            ),
                           ],
                         ),
                       ),
@@ -1609,8 +1613,11 @@ class _ContactCard extends StatelessWidget {
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(Icons.edit_outlined,
-                              color: Colors.white, size: 17),
+                          Icon(
+                            Icons.edit_outlined,
+                            color: Colors.white,
+                            size: 17,
+                          ),
                           SizedBox(width: 9),
                           Text('Edit', style: TextStyle(color: Colors.white)),
                         ],
@@ -1730,8 +1737,10 @@ class _HospitalCard extends StatelessWidget {
                               children: [
                                 Icon(Icons.sos, color: _red, size: 17),
                                 SizedBox(width: 9),
-                                Text('Set as default',
-                                    style: TextStyle(color: Colors.white)),
+                                Text(
+                                  'Set as default',
+                                  style: TextStyle(color: Colors.white),
+                                ),
                               ],
                             ),
                           ),
@@ -1739,11 +1748,16 @@ class _HospitalCard extends StatelessWidget {
                           value: 'edit',
                           child: Row(
                             children: [
-                              Icon(Icons.edit_outlined,
-                                  color: Colors.white, size: 17),
+                              Icon(
+                                Icons.edit_outlined,
+                                color: Colors.white,
+                                size: 17,
+                              ),
                               SizedBox(width: 9),
-                              Text('Edit',
-                                  style: TextStyle(color: Colors.white)),
+                              Text(
+                                'Edit',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ],
                           ),
                         ),
@@ -2300,11 +2314,7 @@ class _HubTextField extends StatelessWidget {
   final TextEditingController? controller;
   final TextInputType? keyboardType;
 
-  const _HubTextField({
-    required this.hint,
-    this.controller,
-    this.keyboardType,
-  });
+  const _HubTextField({required this.hint, this.controller, this.keyboardType});
 
   @override
   Widget build(BuildContext context) {

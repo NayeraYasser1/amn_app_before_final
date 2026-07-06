@@ -33,7 +33,7 @@ class VoiceAssistantScreen extends StatefulWidget {
   const VoiceAssistantScreen({super.key});
 
   @override
-  State<VoiceAssistantScreen> createState() => _VoiceAssistantScreenState();
+  State<VoiceAssistantScreen> get createState => _VoiceAssistantScreenState();
 }
 
 class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
@@ -177,7 +177,9 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
         // Only switch engines when the device default is NOT already Google.
         // Re-binding an already-Google engine disturbs the shared audio path
         // and can make the very next speech-recognition start fail.
-        final current = (await _tts.getDefaultEngine.timeout(limit))?.toString();
+        final current = (await _tts.getDefaultEngine.timeout(
+          limit,
+        ))?.toString();
         if (current != 'com.google.android.tts') {
           final engines = await _tts.getEngines.timeout(limit);
           if (engines is List && engines.contains('com.google.android.tts')) {
@@ -188,8 +190,9 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
       // Use the user's saved speaking speed (Settings -> Voice Preferences),
       // defaulting to a natural pace. Key matches VoicePreferencesScreen.rateKey.
       final rate =
-          (await SharedPreferences.getInstance())
-              .getDouble('voice_speech_rate') ??
+          (await SharedPreferences.getInstance()).getDouble(
+            'voice_speech_rate',
+          ) ??
           0.48;
       await _tts.setSpeechRate(rate).timeout(limit);
       await _tts.setPitch(1.0).timeout(limit);
@@ -230,9 +233,9 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
       final placeholder = RegExp(r'\[(\w+)\]');
       const slotMarker = 'slotmarker';
       final normalized = _normalize(phrase.replaceAll(placeholder, slotMarker));
-      final body = RegExp.escape(normalized)
-          .replaceAll(slotMarker, '(.+)')
-          .replaceAll(' ', r'\s+');
+      final body = RegExp.escape(
+        normalized,
+      ).replaceAll(slotMarker, '(.+)').replaceAll(' ', r'\s+');
       // Anchored so a command matches the whole utterance, not a fragment of
       // an unrelated sentence.
       return RegExp('^$body\$');
@@ -1382,28 +1385,28 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
                     child: GestureDetector(
                       onTap: _toggleListening,
                       child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      width: _listening ? 124 : 112,
-                      height: _listening ? 124 : 112,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: _listening
-                              ? const [Colors.redAccent, Colors.orangeAccent]
-                              : const [Color(0xFF2E7DFF), Color(0xFF8E24AA)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                (_listening ? Colors.redAccent : Colors.blue)
-                                    .withValues(alpha: 0.45),
-                            blurRadius: _listening ? 38 : 26,
-                            spreadRadius: _listening ? 8 : 3,
+                        duration: const Duration(milliseconds: 220),
+                        width: _listening ? 124 : 112,
+                        height: _listening ? 124 : 112,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: _listening
+                                ? const [Colors.redAccent, Colors.orangeAccent]
+                                : const [Color(0xFF2E7DFF), Color(0xFF8E24AA)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
-                      ),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  (_listening ? Colors.redAccent : Colors.blue)
+                                      .withValues(alpha: 0.45),
+                              blurRadius: _listening ? 38 : 26,
+                              spreadRadius: _listening ? 8 : 3,
+                            ),
+                          ],
+                        ),
                         child: Icon(
                           _listening ? Icons.mic : Icons.mic_none,
                           color: Colors.white,

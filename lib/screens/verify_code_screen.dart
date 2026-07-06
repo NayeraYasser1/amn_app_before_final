@@ -77,7 +77,7 @@ class VerifyCodeScreen extends StatefulWidget {
   const VerifyCodeScreen({super.key, required this.args});
 
   @override
-  State<VerifyCodeScreen> createState() => _VerifyCodeScreenState();
+  State<VerifyCodeScreen> get createState => _VerifyCodeScreenState();
 }
 
 class _VerifyCodeScreenState extends State<VerifyCodeScreen> {

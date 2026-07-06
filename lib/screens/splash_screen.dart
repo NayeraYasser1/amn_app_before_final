@@ -5,7 +5,7 @@ class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  State<SplashScreen> get createState => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen>
@@ -64,12 +64,11 @@ class _SplashScreenState extends State<SplashScreen>
                     height: 180,
                     child: Image.asset(
                       "images/logo3.png",
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(
-                            Icons.shield_outlined,
-                            size: 120,
-                            color: Colors.white,
-                          ),
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.shield_outlined,
+                        size: 120,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),

@@ -8,7 +8,7 @@ class AndroidCallBridgeStatusScreen extends StatefulWidget {
   const AndroidCallBridgeStatusScreen({super.key});
 
   @override
-  State<AndroidCallBridgeStatusScreen> createState() =>
+  State<AndroidCallBridgeStatusScreen> get createState =>
       _AndroidCallBridgeStatusScreenState();
 }
 
@@ -72,7 +72,9 @@ class _AndroidCallBridgeStatusScreenState
     final ok = result['ok'] == true;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? successMessage : '${result['error'] ?? 'Action failed.'}'),
+        content: Text(
+          ok ? successMessage : '${result['error'] ?? 'Action failed.'}',
+        ),
         backgroundColor: ok ? Colors.green[700] : Colors.red[700],
       ),
     );
@@ -112,7 +114,10 @@ class _AndroidCallBridgeStatusScreenState
                       children: [
                         _buildRow('Running', running ? 'Yes' : 'No'),
                         _buildRow('Port', '$port'),
-                        _buildRow('Default dialer', defaultDialer ? 'Yes' : 'No'),
+                        _buildRow(
+                          'Default dialer',
+                          defaultDialer ? 'Yes' : 'No',
+                        ),
                         _buildRow(
                           'Permissions',
                           permissionsGranted ? 'Granted' : 'Missing',
@@ -136,7 +141,9 @@ class _AndroidCallBridgeStatusScreenState
                         ),
                         _buildRow(
                           'Number',
-                          (_callStatus['caller_number'] ?? '').toString().isEmpty
+                          (_callStatus['caller_number'] ?? '')
+                                  .toString()
+                                  .isEmpty
                               ? '--'
                               : (_callStatus['caller_number'] ?? '').toString(),
                         ),
@@ -155,7 +162,10 @@ class _AndroidCallBridgeStatusScreenState
                         const SizedBox(height: 10),
                         Text(
                           (_callStatus['message'] ?? '').toString(),
-                          style: TextStyle(color: Colors.grey[300], fontSize: 13),
+                          style: TextStyle(
+                            color: Colors.grey[300],
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -184,7 +194,8 @@ class _AndroidCallBridgeStatusScreenState
                             _actionButton(
                               label: 'Ignore Battery Optimization',
                               onTap: () async {
-                                await _bridge.requestBatteryOptimizationExemption();
+                                await _bridge
+                                    .requestBatteryOptimizationExemption();
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -193,7 +204,9 @@ class _AndroidCallBridgeStatusScreenState
                                     ),
                                   ),
                                 );
-                                await Future.delayed(const Duration(seconds: 1));
+                                await Future.delayed(
+                                  const Duration(seconds: 1),
+                                );
                                 await _refreshStatus(showLoader: false);
                               },
                             ),
@@ -266,10 +279,7 @@ class _AndroidCallBridgeStatusScreenState
     );
   }
 
-  Widget _actionButton({
-    required String label,
-    required VoidCallback onTap,
-  }) {
+  Widget _actionButton({required String label, required VoidCallback onTap}) {
     return SizedBox(
       width: 220,
       child: ElevatedButton(

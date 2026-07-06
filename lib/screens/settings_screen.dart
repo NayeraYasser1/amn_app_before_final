@@ -30,7 +30,7 @@ class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.onLocaleChanged});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<SettingsScreen> get createState => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
@@ -462,11 +462,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!ok && mounted) {
-        showAppSnack(context, 'No email app found. Reach us at support@amnapp.example');
+        showAppSnack(
+          context,
+          'No email app found. Reach us at support@amnapp.example',
+        );
       }
     } catch (_) {
       if (mounted) {
-        showAppSnack(context, 'No email app found. Reach us at support@amnapp.example');
+        showAppSnack(
+          context,
+          'No email app found. Reach us at support@amnapp.example',
+        );
       }
     }
   }

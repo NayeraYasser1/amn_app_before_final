@@ -9,7 +9,7 @@ class CarInformationScreen extends StatefulWidget {
   const CarInformationScreen({super.key});
 
   @override
-  State<CarInformationScreen>  createState()  => _CarInformationScreenState();
+  State<CarInformationScreen> get createState => _CarInformationScreenState();
 }
 
 class _CarInformationScreenState extends State<CarInformationScreen> {

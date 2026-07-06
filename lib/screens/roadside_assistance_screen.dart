@@ -27,7 +27,7 @@ class CarServiceScreen extends StatefulWidget {
   const CarServiceScreen({super.key, this.onLocaleChanged});
 
   @override
-  State<CarServiceScreen> createState() => _CarServiceScreenState();
+  State<CarServiceScreen> get createState => _CarServiceScreenState();
 }
 
 class _CarServiceScreenState extends State<CarServiceScreen> {

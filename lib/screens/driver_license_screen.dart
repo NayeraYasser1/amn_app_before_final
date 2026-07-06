@@ -9,7 +9,7 @@ class DriverLicenseScreen extends StatefulWidget {
   const DriverLicenseScreen({super.key});
 
   @override
-  State<DriverLicenseScreen>  createState()  => _DriverLicenseScreenState();
+  State<DriverLicenseScreen> get createState => _DriverLicenseScreenState();
 }
 
 class _DriverLicenseScreenState extends State<DriverLicenseScreen> {

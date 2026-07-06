@@ -12,7 +12,7 @@ class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  State<EditProfileScreen>  createState()  => _EditProfileScreenState();
+  State<EditProfileScreen> get createState => _EditProfileScreenState();
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
@@ -171,8 +171,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _dateOfBirthController.text = data['dateOfBirth'] ?? '';
           _countryController.text = data['country'] ?? '';
           _allergiesController.text = data['allergies'] ?? '';
-          _hospitalInsuranceController.text =
-              data['hospitalInsurance'] ?? '';
+          _hospitalInsuranceController.text = data['hospitalInsurance'] ?? '';
 
           _profileImageUrl =
               (data['profilePictureUrl'] as String?) ??

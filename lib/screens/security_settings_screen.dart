@@ -11,7 +11,8 @@ class SecuritySettingsScreen extends StatefulWidget {
   const SecuritySettingsScreen({super.key});
 
   @override
-  State<SecuritySettingsScreen> createState() => _SecuritySettingsScreenState();
+  State<SecuritySettingsScreen> get createState =>
+      _SecuritySettingsScreenState();
 }
 
 class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
@@ -21,10 +22,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
     final user = FirebaseAuth.instance.currentUser;
     final email = user?.email;
     if (email == null || email.isEmpty) {
-      showAppSnack(
-        context,
-        'This account has no email address to reset.',
-      );
+      showAppSnack(context, 'This account has no email address to reset.');
       return;
     }
     setState(() => _sending = true);
@@ -108,7 +106,11 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             const Text(
               'We send a secure reset link to your email — your password is '
               'never changed from inside the app.',
-              style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4),
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 14),
             SizedBox(
@@ -126,7 +128,9 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                         ),
                       )
                     : const Icon(Icons.lock_reset),
-                label: Text(_sending ? 'Sending…' : 'Send password reset email'),
+                label: Text(
+                  _sending ? 'Sending…' : 'Send password reset email',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black,

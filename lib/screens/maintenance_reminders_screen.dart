@@ -10,7 +10,7 @@ class MaintenanceRemindersScreen extends StatefulWidget {
   const MaintenanceRemindersScreen({super.key});
 
   @override
-  State<MaintenanceRemindersScreen> createState() =>
+  State<MaintenanceRemindersScreen> get createState =>
       _MaintenanceRemindersScreenState();
 }
 
@@ -104,9 +104,7 @@ class _MaintenanceRemindersScreenState
                               size: 18,
                               color: selected ? Colors.black : Colors.white,
                             ),
-                            label: Text(
-                              preset.replaceAll(' maintenance', ''),
-                            ),
+                            label: Text(preset.replaceAll(' maintenance', '')),
                             labelStyle: TextStyle(
                               color: selected ? Colors.black : Colors.white,
                               fontSize: 13,
@@ -136,63 +134,61 @@ class _MaintenanceRemindersScreenState
                         ),
                       ),
                       const SizedBox(height: 20),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: dialogContext,
-                        initialDate: due,
-                        firstDate: DateTime.now().subtract(
-                          const Duration(days: 365),
-                        ),
-                        lastDate: DateTime.now().add(
-                          const Duration(days: 365 * 5),
-                        ),
-                        builder: (context, child) => Theme(
-                          data: ThemeData.dark(),
-                          child: child!,
-                        ),
-                      );
-                      if (picked != null) {
-                        setDialogState(() => due = picked);
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey[800]!),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.event,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Due ${_formatDate(due)}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                              ),
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: dialogContext,
+                            initialDate: due,
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 365),
                             ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365 * 5),
+                            ),
+                            builder: (context, child) =>
+                                Theme(data: ThemeData.dark(), child: child!),
+                          );
+                          if (picked != null) {
+                            setDialogState(() => due = picked);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
                           ),
-                          Icon(
-                            Icons.edit_calendar,
-                            color: Colors.grey[500],
-                            size: 18,
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey[800]!),
                           ),
-                        ],
-                      ),
-                    ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.event,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Due ${_formatDate(due)}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.edit_calendar,
+                                color: Colors.grey[500],
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -229,10 +225,7 @@ class _MaintenanceRemindersScreenState
     final title = titleController.text.trim();
     // Dispose after the dialog's exit animation; the TextField is still bound
     // to this controller while the route animates out.
-    Future.delayed(
-      const Duration(milliseconds: 400),
-      titleController.dispose,
-    );
+    Future.delayed(const Duration(milliseconds: 400), titleController.dispose);
     if (saved != true) return;
     final entry = {
       'title': title,
@@ -354,8 +347,11 @@ class _MaintenanceRemindersScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.build_circle_outlined,
-                        color: Colors.grey[700], size: 64),
+                    Icon(
+                      Icons.build_circle_outlined,
+                      color: Colors.grey[700],
+                      size: 64,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'No maintenance reminders',
@@ -398,9 +394,7 @@ class _MaintenanceRemindersScreenState
                         final item = _items[index];
                         final title = (item['title'] ?? '').toString();
                         final due = MaintenanceRemindersService.dueOf(item);
-                        final days = MaintenanceRemindersService.daysUntil(
-                          due,
-                        );
+                        final days = MaintenanceRemindersService.daysUntil(due);
                         final pinned = item['pinned'] == true;
                         return Material(
                           color: Colors.grey[900],
@@ -476,8 +470,9 @@ class _MaintenanceRemindersScreenState
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          MaintenanceRemindersService
-                                              .daysLeftLabel(days),
+                                          MaintenanceRemindersService.daysLeftLabel(
+                                            days,
+                                          ),
                                           style: TextStyle(
                                             color: _relativeColor(days),
                                             fontSize: 13,
@@ -488,8 +483,7 @@ class _MaintenanceRemindersScreenState
                                     ),
                                   ),
                                   IconButton(
-                                    onPressed: () =>
-                                        _addOrEdit(index: index),
+                                    onPressed: () => _addOrEdit(index: index),
                                     icon: Icon(
                                       Icons.edit,
                                       color: Colors.grey[500],

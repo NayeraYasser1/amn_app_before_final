@@ -22,7 +22,8 @@ const Color _blue = AppColors.blue;
 const Color _green = AppColors.green;
 const Color _muted = AppColors.muted;
 
-const String _osmTileTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const String _osmTileTemplate =
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 enum _ParkingStage { save, saved, find, navigate, arrived }
 
@@ -53,7 +54,7 @@ class ParkingMapScreen extends StatefulWidget {
   });
 
   @override
-  State<ParkingMapScreen> createState() => _ParkingMapScreenState();
+  State<ParkingMapScreen> get createState => _ParkingMapScreenState();
 }
 
 class _ParkingMapScreenState extends State<ParkingMapScreen> {
@@ -160,10 +161,7 @@ class _ParkingMapScreenState extends State<ParkingMapScreen> {
     // Dispose after the dialog's exit animation finishes; the TextField is
     // still bound to this controller while the route animates out, so an
     // immediate dispose triggers a "used after being disposed" assertion.
-    Future.delayed(
-      const Duration(milliseconds: 400),
-      controller.dispose,
-    );
+    Future.delayed(const Duration(milliseconds: 400), controller.dispose);
     if (result == null || !mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -1312,7 +1310,7 @@ class _ParkingMap extends StatefulWidget {
   });
 
   @override
-  State<_ParkingMap> createState() => _ParkingMapState();
+  State<_ParkingMap> get createState => _ParkingMapState();
 }
 
 class _ParkingMapState extends State<_ParkingMap> {

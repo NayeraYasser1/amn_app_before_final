@@ -14,7 +14,8 @@ class VoicePreferencesScreen extends StatefulWidget {
   const VoicePreferencesScreen({super.key});
 
   @override
-  State<VoicePreferencesScreen> createState() => _VoicePreferencesScreenState();
+  State<VoicePreferencesScreen> get createState =>
+      _VoicePreferencesScreenState();
 }
 
 class _VoicePreferencesScreenState extends State<VoicePreferencesScreen> {
@@ -105,8 +106,10 @@ class _VoicePreferencesScreenState extends State<VoicePreferencesScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Text('Slow',
-                          style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                      const Text(
+                        'Slow',
+                        style: TextStyle(color: AppColors.muted, fontSize: 12),
+                      ),
                       Expanded(
                         child: Slider(
                           value: _rate,
@@ -121,8 +124,10 @@ class _VoicePreferencesScreenState extends State<VoicePreferencesScreen> {
                           onChangeEnd: (_) => _save(),
                         ),
                       ),
-                      const Text('Fast',
-                          style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                      const Text(
+                        'Fast',
+                        style: TextStyle(color: AppColors.muted, fontSize: 12),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 10),

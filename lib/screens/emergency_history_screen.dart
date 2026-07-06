@@ -26,7 +26,8 @@ class EmergencyHistoryScreen extends StatefulWidget {
   const EmergencyHistoryScreen({super.key, this.onLocaleChanged});
 
   @override
-  State<EmergencyHistoryScreen> createState() => _EmergencyHistoryScreenState();
+  State<EmergencyHistoryScreen> get createState =>
+      _EmergencyHistoryScreenState();
 }
 
 class _EmergencyHistoryScreenState extends State<EmergencyHistoryScreen> {
